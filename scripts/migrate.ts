@@ -14,9 +14,18 @@ async function main() {
 
   for (const file of files) {
     const sqlText = fs.readFileSync(path.join(migrationsDir, file), "utf8");
-    await sql.query(sqlText);
+    for (const statement of splitSqlStatements(sqlText)) {
+      await sql.query(statement);
+    }
     console.log(`applied ${file}`);
   }
+}
+
+function splitSqlStatements(sqlText: string) {
+  return sqlText
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
 }
 
 main().catch((error) => {
