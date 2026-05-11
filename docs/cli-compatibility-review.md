@@ -1,0 +1,122 @@
+# CLI Compatibility Review
+
+Review date: 2026-05-11
+
+This document records the current compatibility review between this mirror server implementation
+and the private-state CLI channel workspace mirror client.
+
+## Reviewed CLI Contract
+
+The CLI expects the registered channel mirror URL to behave as either:
+
+- a base URL, where the CLI fetches
+  `/.well-known/tokamak-private-state/channel-workspace/<chainId>/<channelId>/manifest.json`
+- a direct `.json` manifest URL, where bundle URLs are resolved relative to that manifest URL
+
+For protocol version `2`, the manifest and bundle metadata, not the URL path, carry the protocol
+version. The CLI then validates the manifest against on-chain channel metadata and downloads either
+the full `checkpoint.zip` bundle or the exact delta bundle needed for the local recovery index.
+
+The required public read paths for the normal base-URL layout are:
+
+```text
+GET /.well-known/tokamak-private-state/channel-workspace/<chainId>/<channelId>/manifest.json
+GET /.well-known/tokamak-private-state/channel-workspace/<chainId>/<channelId>/checkpoint.zip
+GET /.well-known/tokamak-private-state/channel-workspace/<chainId>/<channelId>/deltas/<from>-<to>.json
+```
+
+## Compatibility Status
+
+The server is compatible with the CLI's normal read path.
+
+- `next.config.ts` rewrites the three stable well-known read paths to dynamic route handlers.
+- The read route handlers return HTTP `307` redirects to public Vercel Blob URLs. The CLI uses
+  `fetch`, so redirect-based delivery is compatible with the client.
+- Uploaded CLI output preserves the public path of `manifest.json`, `checkpoint.zip`, and delta
+  JSON files. This also supports registered URLs with custom base paths or direct manifest paths
+  through the catch-all route.
+- The server rejects stale publishes whose checkpoint block is not newer than the latest stored
+  checkpoint for the same `chainId/channelId`.
+- The server uploads large bundles to Blob instead of proxying them through Vercel Functions, which
+  matches the expected large-checkpoint operating model.
+
+The CLI remains the final verifier. It checks the leader signature, on-chain channel metadata,
+checkpoint content hashes, bundle SHA-256, exact bundle size, delta log validity, root-vector
+transitions, and the final replay result against `ChannelManager.currentRootVectorHash()`.
+
+## Gaps To Address
+
+These items do not currently break compatibility when the upload input is the unmodified output of
+`private-state-cli channel publish-workspace-mirror`. They are still worth fixing because the server
+claims to validate uploaded mirror artifacts and should reject malformed operator uploads before
+they are published.
+
+### Require `sizeBytes` in upload validation
+
+Protocol version `2` requires `checkpoint.bundle.sizeBytes` and every
+`deltaBundles[].sizeBytes`. The CLI refuses to download a bundle when `sizeBytes` is missing.
+
+Current server behavior:
+
+- `validateBundleDescriptor` treats `sizeBytes` as optional.
+- `validateBundle` only compares the declared size when it is present.
+- The uploaded manifest blob is not rewritten, so a manifest missing `sizeBytes` would be served
+  unchanged and later rejected by the CLI.
+
+Recommended fix:
+
+- Reject missing `sizeBytes` for checkpoint and delta bundle descriptors.
+- Keep comparing the declared value with the local file size.
+- Add tests for missing checkpoint and delta `sizeBytes`.
+
+### Validate checkpoint ZIP structure at upload time
+
+The CLI requires `checkpoint.zip` to contain exactly these root-level JSON files:
+
+- `workspace.json`
+- `state_snapshot.json`
+- `block_info.json`
+- `contract_codes.json`
+
+The server currently validates the checkpoint file's SHA-256 and size but does not inspect the ZIP
+contents. A malformed checkpoint would be stored successfully and then rejected by the CLI during
+recovery.
+
+Recommended fix:
+
+- Inspect the ZIP during upload validation.
+- Reject nested paths, absolute paths, duplicate files, unsupported files, and missing required
+  files.
+- Validate each required file is valid UTF-8 JSON.
+
+### Validate delta JSON shape at upload time
+
+The server validates delta bundle file existence, SHA-256, and size, but does not parse the delta
+JSON or compare the file contents with the manifest descriptor.
+
+Recommended fix:
+
+- Parse each delta JSON during upload validation.
+- Require `protocolVersion === 2`, matching `chainId`, matching `channelId`, descriptor-matching
+  `fromBlock` and `toBlock`, bytes32 root hashes, and an array `logs` field.
+- Leave full log semantic validation to the CLI, because it requires bridge ABI and channel context.
+
+### Add an integration fixture that matches real CLI output
+
+Current tests cover a minimal synthetic upload directory. They do not exercise a real
+`channel publish-workspace-mirror` output shape or route lookup through the expected public paths.
+
+Recommended fix:
+
+- Add a fixture generated by the CLI or a faithful static fixture with all required manifest fields,
+  checkpoint ZIP files, and a delta JSON.
+- Test `validateMirrorUploadDirectory` against that fixture.
+- Test route lookup behavior for the normal well-known path, a custom base path, and a direct
+  `.json` manifest path using seeded publish rows.
+
+## Operational Notes
+
+The server should not attempt to reproduce the CLI's full trust validation. The channel leader
+signature and on-chain metadata checks belong to the CLI recovery path. The server's role is to
+reject malformed uploads early, preserve the CLI-compatible public URL layout, and make the latest
+valid checkpoint and delta artifacts available efficiently.
