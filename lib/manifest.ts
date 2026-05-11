@@ -1,13 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
+import { TextDecoder } from "node:util";
+import AdmZip from "adm-zip";
 import { MIRROR_PROTOCOL_VERSION } from "./constants";
+import { CHECKPOINT_FILES } from "./constants";
 import { sha256File } from "./crypto";
 import { assertSafeRelativeUrl, joinPublicPath, resolveArtifactPath, toPublicPath } from "./paths";
 
 export type MirrorBundleDescriptor = {
   url: string;
   sha256: string;
-  sizeBytes?: number;
+  sizeBytes: number;
 };
 
 export type MirrorDeltaBundle = MirrorBundleDescriptor & {
@@ -96,6 +99,7 @@ export async function validateMirrorUploadDirectory(rootDir: string): Promise<Va
   const manifestPublicPath = toPublicPath(manifestPath, resolvedRoot);
   const manifestSha256 = await sha256File(manifestPath);
   const checkpoint = await validateBundle({
+    manifest,
     manifestDir,
     manifestPublicPath,
     descriptor: manifest.checkpoint.bundle,
@@ -105,6 +109,7 @@ export async function validateMirrorUploadDirectory(rootDir: string): Promise<Va
 
   const deltaBundles = Array.isArray(manifest.deltaBundles) ? manifest.deltaBundles : [];
   const deltas = await Promise.all(deltaBundles.map((bundle, index) => validateBundle({
+    manifest,
     manifestDir,
     manifestPublicPath,
     descriptor: bundle,
@@ -189,12 +194,13 @@ function validateBundleDescriptor(descriptor: MirrorBundleDescriptor, label: str
   if (typeof descriptor.sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(descriptor.sha256)) {
     throw new Error(`${label}.sha256 must be a lowercase SHA-256 digest.`);
   }
-  if (descriptor.sizeBytes !== undefined && !Number.isInteger(Number(descriptor.sizeBytes))) {
-    throw new Error(`${label}.sizeBytes must be an integer when present.`);
+  if (!Number.isInteger(Number(descriptor.sizeBytes))) {
+    throw new Error(`${label}.sizeBytes must be an integer.`);
   }
 }
 
 async function validateBundle({
+  manifest,
   manifestDir,
   manifestPublicPath,
   descriptor,
@@ -203,6 +209,7 @@ async function validateBundle({
   fromBlock,
   toBlock,
 }: {
+  manifest: MirrorManifest;
   manifestDir: string;
   manifestPublicPath: string;
   descriptor: MirrorBundleDescriptor;
@@ -217,12 +224,17 @@ async function validateBundle({
     throw new Error(`${label}.url references a missing file: ${relativeUrl}`);
   }
   const stat = fs.statSync(filePath);
-  if (descriptor.sizeBytes !== undefined && Number(descriptor.sizeBytes) !== stat.size) {
+  if (Number(descriptor.sizeBytes) !== stat.size) {
     throw new Error(`${label}.sizeBytes mismatch. Expected ${descriptor.sizeBytes}, got ${stat.size}.`);
   }
   const digest = await sha256File(filePath);
   if (digest !== descriptor.sha256) {
     throw new Error(`${label}.sha256 mismatch. Expected ${descriptor.sha256}, got ${digest}.`);
+  }
+  if (kind === "checkpoint") {
+    validateCheckpointZip(filePath);
+  } else {
+    validateDeltaJson({ filePath, manifest, fromBlock, toBlock, label });
   }
   return {
     kind,
@@ -234,6 +246,96 @@ async function validateBundle({
     fromBlock,
     toBlock,
   };
+}
+
+function validateCheckpointZip(filePath: string) {
+  const zip = new AdmZip(filePath);
+  const seen = new Set<string>();
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) {
+      throw new Error(`checkpoint.zip contains unsupported directory: ${entry.entryName}`);
+    }
+    const entryName = entry.entryName;
+    if (
+      path.posix.isAbsolute(entryName)
+      || entryName.includes("\\")
+      || entryName.split("/").some((segment) => segment === ".." || segment === "")
+    ) {
+      throw new Error(`checkpoint.zip contains unsupported path: ${entryName}`);
+    }
+    if (entryName.includes("/")) {
+      throw new Error(`checkpoint.zip contains nested path: ${entryName}`);
+    }
+    if (!CHECKPOINT_FILES.has(entryName)) {
+      throw new Error(`checkpoint.zip contains unsupported file: ${entryName}`);
+    }
+    if (seen.has(entryName)) {
+      throw new Error(`checkpoint.zip contains duplicate file: ${entryName}`);
+    }
+    seen.add(entryName);
+    parseJsonBytes(entry.getData(), `checkpoint.zip ${entryName}`);
+  }
+  for (const fileName of CHECKPOINT_FILES) {
+    if (!seen.has(fileName)) {
+      throw new Error(`checkpoint.zip is missing ${fileName}.`);
+    }
+  }
+}
+
+function validateDeltaJson({
+  filePath,
+  manifest,
+  fromBlock,
+  toBlock,
+  label,
+}: {
+  filePath: string;
+  manifest: MirrorManifest;
+  fromBlock?: number;
+  toBlock?: number;
+  label: string;
+}) {
+  const delta = parseJsonBytes(fs.readFileSync(filePath), label) as Record<string, unknown>;
+  if (Number(delta.protocolVersion) !== MIRROR_PROTOCOL_VERSION) {
+    throw new Error(`${label}.protocolVersion mismatch.`);
+  }
+  if (Number(delta.chainId) !== Number(manifest.chainId)) {
+    throw new Error(`${label}.chainId mismatch.`);
+  }
+  if (String(delta.channelId) !== String(manifest.channelId)) {
+    throw new Error(`${label}.channelId mismatch.`);
+  }
+  if (Number(delta.fromBlock) !== fromBlock) {
+    throw new Error(`${label}.fromBlock mismatch.`);
+  }
+  if (Number(delta.toBlock) !== toBlock) {
+    throw new Error(`${label}.toBlock mismatch.`);
+  }
+  for (const field of ["baseRecoveryRootVectorHash", "recoveryRootVectorHash"] as const) {
+    if (typeof delta[field] !== "string" || !/^0x[0-9a-f]{64}$/iu.test(delta[field])) {
+      throw new Error(`${label}.${field} must be a bytes32 hex string.`);
+    }
+  }
+  if (String(delta.recoveryRootVectorHash).toLowerCase() !== manifest.checkpoint.recoveryRootVectorHash.toLowerCase()) {
+    throw new Error(`${label}.recoveryRootVectorHash must match the manifest checkpoint root.`);
+  }
+  if (!Array.isArray(delta.logs)) {
+    throw new Error(`${label}.logs must be an array.`);
+  }
+}
+
+function parseJsonBytes(bytes: Buffer, label: string) {
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (error) {
+    throw new Error(`${label} must be valid UTF-8: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${label} must be valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function walk(rootDir: string, onFile: (filePath: string) => void) {
