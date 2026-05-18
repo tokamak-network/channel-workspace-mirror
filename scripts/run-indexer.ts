@@ -106,6 +106,7 @@ async function configurePrivateStateCli(config: Awaited<ReturnType<typeof requir
 
 function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
   const result = run("private-state-cli", [
+    "--json",
     "channel",
     "recover-workspace",
     "--channel-name",
