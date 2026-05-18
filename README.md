@@ -128,6 +128,10 @@ The integrated worker command is:
 npm run indexer:run
 ```
 
+Run this command from a persistent worker host, not from Vercel Functions. The Vercel deployment
+serves the public mirror and observer APIs, while the worker host keeps the private-state CLI
+workspace, recovery index, and raw RPC history on durable local disk.
+
 It performs the operator flow in this order:
 
 - `private-state-cli install --read-only`
@@ -147,6 +151,21 @@ Observer RPC calls use only the RPC scan parameters imported from the private-st
 `rpc-config.env`. `LOG_REQUESTS_PER_SECOND` is applied to observer `eth_blockNumber`,
 `eth_getLogs`, and `eth_getBlockByNumber` calls, and every observer `eth_getLogs` request scans
 exactly one `RPC_BLOCK_RANGE_CAP` block window except for the final shorter tail range.
+
+## Persistent Worker
+
+The repository includes an Ubuntu/systemd deployment helper for an EC2 worker:
+
+```text
+ops/aws-worker/
+```
+
+The worker uses the same Neon database and Vercel Blob token as the Vercel deployment. Runtime RPC
+configuration is still managed through `/api/admin/indexer-config`; the EC2 host only needs
+`DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, and `ADMIN_TOKEN` in `/etc/channel-workspace-mirror.env`.
+
+The systemd timer runs frequently, but `npm run indexer:run` checks the DB runtime intervals before
+performing any heavy recovery, observer sync, or mirror publish work.
 
 ## Health
 
