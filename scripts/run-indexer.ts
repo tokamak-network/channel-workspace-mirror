@@ -96,16 +96,11 @@ async function main() {
 
 async function configurePrivateStateCli(config: Awaited<ReturnType<typeof requireIndexerRuntimeConfig>>) {
   run("private-state-cli", ["install", "--read-only"]);
+  const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
+  const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
   const rpcArgs = ["set", "rpc", "--network", "mainnet", "--rpc-url", config.rpc_url];
-  if (config.rpc_provider) {
-    rpcArgs.push("--provider", config.rpc_provider);
-  }
-  if (config.log_requests_per_second !== null) {
-    rpcArgs.push("--log-requests-per-second", String(config.log_requests_per_second));
-  }
-  if (config.block_range_cap !== null) {
-    rpcArgs.push("--block-range-cap", String(config.block_range_cap));
-  }
+  rpcArgs.push("--log-requests-per-second", String(logRequestsPerSecond));
+  rpcArgs.push("--block-range-cap", String(blockRangeCap));
   run("private-state-cli", rpcArgs);
 }
 
@@ -176,12 +171,21 @@ function run(command: string, args: string[], options: { capture?: boolean } = {
   });
   if (result.status !== 0) {
     const stderr = result.stderr?.trim();
-    throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}${stderr ? `: ${stderr}` : ""}`);
+    throw new Error(`${command} ${formatArgs(args)} failed with exit code ${result.status ?? "unknown"}${stderr ? `: ${stderr}` : ""}`);
   }
   return {
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
   };
+}
+
+function formatArgs(args: string[]) {
+  const masked = [...args];
+  const rpcUrlIndex = masked.indexOf("--rpc-url");
+  if (rpcUrlIndex !== -1 && masked[rpcUrlIndex + 1]) {
+    masked[rpcUrlIndex + 1] = "<redacted>";
+  }
+  return masked.join(" ");
 }
 
 function parseLastJsonObject(stdout: string) {
