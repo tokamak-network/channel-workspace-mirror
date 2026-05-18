@@ -143,6 +143,11 @@ The first observer worker run performs `recover-workspace --from-genesis --outpu
 history import state exists yet. Later runs use the CLI recovery index and append only new raw RPC
 history.
 
+Observer RPC calls are rate-limited by the runtime config. `log_requests_per_second` is applied to
+observer `eth_blockNumber`, `eth_getLogs`, and `eth_getBlockByNumber` calls, and every observer
+`eth_getLogs` request uses `min(observerBatchSize, blockRangeCap)` so the configured block range cap
+is never exceeded.
+
 ## Health
 
 ```text

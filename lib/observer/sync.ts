@@ -24,6 +24,8 @@ type ObserverSyncOptions = {
   rpcUrl: string;
   rawHistoryDir?: string | null;
   batchSize: number;
+  blockRangeCap: number;
+  logRequestsPerSecond: number;
   confirmations: bigint;
 };
 
@@ -82,10 +84,14 @@ const TARGETED_EVENTS = [
 
 export async function syncDefaultObserverChannel(rawHistoryDir?: string | null): Promise<SyncResult> {
   const runtime = await requireIndexerRuntimeConfig(DEFAULT_OBSERVER_CHANNEL.slug);
+  const logRequestsPerSecond = requiredPositiveNumber(runtime.log_requests_per_second, "log_requests_per_second");
+  const blockRangeCap = requiredPositiveInteger(runtime.block_range_cap, "block_range_cap");
   return syncObserverChannel(DEFAULT_OBSERVER_CHANNEL, {
     rpcUrl: runtime.rpc_url,
     rawHistoryDir,
     batchSize: runtime.observer_batch_size,
+    blockRangeCap,
+    logRequestsPerSecond,
     confirmations: BigInt(runtime.observer_confirmations),
   });
 }
@@ -100,18 +106,20 @@ export async function syncObserverChannel(
   const client = createPublicClient({
     transport: http(options.rpcUrl),
   });
-  const latestBlock = await client.getBlockNumber();
+  const limiter = createRpcRateLimiter(options.logRequestsPerSecond);
+  const latestBlock = await limitedRpc(limiter, () => client.getBlockNumber());
   const safeLatestBlock = latestBlock > options.confirmations ? latestBlock - options.confirmations : 0n;
 
   const rawImported = options.rawHistoryDir
-    ? await importRawRpcCallHistory({ channel, client, historyDir: options.rawHistoryDir })
+    ? await importRawRpcCallHistory({ channel, client, limiter, historyDir: options.rawHistoryDir })
     : 0;
   const targetedInsertedOrUpdated = await syncTargetedEvents({
     channel,
     client,
+    limiter,
     safeLatestBlock,
     latestBlock,
-    batchSize: BigInt(options.batchSize),
+    blockRangeCap: BigInt(Math.min(options.batchSize, options.blockRangeCap)),
   });
 
   await updateSummarySyncState(channel, safeLatestBlock, latestBlock);
@@ -208,10 +216,12 @@ async function upsertChannel(channel: ObserverChannelConfig) {
 async function importRawRpcCallHistory({
   channel,
   client,
+  limiter,
   historyDir,
 }: {
   channel: ObserverChannelConfig;
   client: ReturnType<typeof createPublicClient>;
+  limiter: RpcRateLimiter;
   historyDir: string;
 }) {
   if (!fs.existsSync(historyDir)) {
@@ -243,7 +253,7 @@ async function importRawRpcCallHistory({
       }
     }
 
-    const timestamps = await blockTimestamps(client, channel.chainId, decodedLogs);
+    const timestamps = await blockTimestamps(client, limiter, channel.chainId, decodedLogs);
     for (const decoded of decodedLogs) {
       await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null, CLI_RAW_RECOVERY_SOURCE);
       imported += 1;
@@ -256,15 +266,17 @@ async function importRawRpcCallHistory({
 async function syncTargetedEvents({
   channel,
   client,
+  limiter,
   safeLatestBlock,
   latestBlock,
-  batchSize,
+  blockRangeCap,
 }: {
   channel: ObserverChannelConfig;
   client: ReturnType<typeof createPublicClient>;
+  limiter: RpcRateLimiter;
   safeLatestBlock: bigint;
   latestBlock: bigint;
-  batchSize: bigint;
+  blockRangeCap: bigint;
 }) {
   let insertedOrUpdated = 0;
   for (const target of TARGETED_EVENTS) {
@@ -278,15 +290,15 @@ async function syncTargetedEvents({
 
     let cursor = fromBlock;
     while (cursor <= safeLatestBlock) {
-      const toBlock = minBigInt(cursor + batchSize - 1n, safeLatestBlock);
-      const logs = await client.getLogs({
+      const toBlock = minBigInt(cursor + blockRangeCap - 1n, safeLatestBlock);
+      const logs = await limitedRpc(limiter, () => client.getLogs({
         address: addressForTarget(channel, target.addressKey),
         event: abiEvent(target.eventName),
         fromBlock: cursor,
         toBlock,
-      });
+      }));
       const relevantLogs = decodeRelevantLogs(channel, logs);
-      const timestamps = await blockTimestamps(client, channel.chainId, relevantLogs);
+      const timestamps = await blockTimestamps(client, limiter, channel.chainId, relevantLogs);
 
       for (const decoded of relevantLogs) {
         await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null, TARGETED_RPC_SOURCE);
@@ -497,6 +509,7 @@ function jsonReplacer(_key: string, value: unknown) {
 
 async function blockTimestamps(
   client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
   chainId: number,
   logs: DecodedObserverLog[],
 ) {
@@ -521,7 +534,7 @@ async function blockTimestamps(
   }
 
   for (const blockNumber of missing) {
-    const block = await client.getBlock({ blockNumber });
+    const block = await limitedRpc(limiter, () => client.getBlock({ blockNumber }));
     const timestamp = new Date(Number(block.timestamp) * 1000).toISOString();
     timestamps.set(blockNumber.toString(), timestamp);
     await sql`
@@ -541,6 +554,54 @@ async function blockTimestamps(
   }
 
   return timestamps;
+}
+
+type RpcRateLimiter = {
+  wait: () => Promise<void>;
+};
+
+function createRpcRateLimiter(requestsPerSecond: number): RpcRateLimiter {
+  if (!Number.isFinite(requestsPerSecond) || requestsPerSecond <= 0) {
+    throw new Error("logRequestsPerSecond must be a positive number.");
+  }
+  const intervalMs = Math.ceil(1000 / requestsPerSecond);
+  let nextAvailableAt = 0;
+  let queue = Promise.resolve();
+
+  return {
+    wait() {
+      const scheduled = queue.then(async () => {
+        const now = Date.now();
+        const delayMs = Math.max(0, nextAvailableAt - now);
+        if (delayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+        nextAvailableAt = Date.now() + intervalMs;
+      });
+      queue = scheduled.catch(() => undefined);
+      return scheduled;
+    },
+  };
+}
+
+async function limitedRpc<T>(limiter: RpcRateLimiter, call: () => Promise<T>) {
+  await limiter.wait();
+  return call();
+}
+
+function requiredPositiveInteger(value: number | null, name: string) {
+  if (value === null || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be configured as a positive integer.`);
+  }
+  return value;
+}
+
+function requiredPositiveNumber(value: string | number | null, name: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be configured as a positive number.`);
+  }
+  return parsed;
 }
 
 async function insertObserverEvent(

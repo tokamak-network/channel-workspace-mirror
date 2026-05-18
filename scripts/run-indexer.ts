@@ -47,11 +47,15 @@ async function main() {
 
     let observer = null;
     if (observerDue) {
+      const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
+      const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
       await updateIndexerRunState(channel.slug, { observerRunAt: now, rawHistoryDir });
       observer = await syncObserverChannel(channel, {
         rpcUrl: config.rpc_url,
         rawHistoryDir,
         batchSize: config.observer_batch_size,
+        blockRangeCap,
+        logRequestsPerSecond,
         confirmations: BigInt(config.observer_confirmations),
       });
       await updateIndexerRunState(channel.slug, {
@@ -190,6 +194,21 @@ function parseLastJsonObject(stdout: string) {
   } catch (error) {
     throw new Error(`Unable to parse private-state-cli JSON output: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+function requiredPositiveInteger(value: number | null, name: string) {
+  if (value === null || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be configured as a positive integer.`);
+  }
+  return value;
+}
+
+function requiredPositiveNumber(value: string | number | null, name: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be configured as a positive number.`);
+  }
+  return parsed;
 }
 
 main().catch((error) => {
