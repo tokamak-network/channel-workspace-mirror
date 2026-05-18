@@ -35,6 +35,10 @@ Required for the admin health endpoint:
 ADMIN_TOKEN=...
 ```
 
+`ADMIN_TOKEN` protects all operator-only endpoints for both mirror and observer operations. Runtime
+indexer settings such as RPC URL and sync intervals are stored in Neon, not in RPC environment
+variables.
+
 ## Setup
 
 Install dependencies and apply the schema:
@@ -106,24 +110,66 @@ The observer uses separate tables from the mirror artifact history:
 - `observer_sync_state`
 - `observer_events`
 
-Run the sync job from an operator environment with DB credentials and an Ethereum RPC URL:
+Run the sync job from an operator environment with DB credentials after configuring the runtime RPC
+URL through the admin API:
 
 ```bash
-OBSERVER_RPC_URL=https://... npm run observer:sync
+npm run observer:sync
 ```
 
-The sync job indexes public L1 events for the configured channel and stores decoded event rows in
-Neon. Vercel serves the observer page and API from the indexed rows; long-running indexing should
-run as a cron, worker, GitHub Actions job, or local `launchd` job rather than inside a request
-handler.
+The observer does not use `OBSERVER_RPC_URL` or `RPC_URL` fallbacks. The sync job reads RPC settings
+from `indexer_runtime_config`. It imports CLI `channel recover-workspace --output-raw` call history
+when a raw history directory is provided and then performs targeted event scans only for checklist
+events that `channel recover-workspace` does not query.
+
+The integrated worker command is:
+
+```bash
+npm run indexer:run
+```
+
+It performs the operator flow in this order:
+
+- `private-state-cli install --read-only`
+- `private-state-cli set rpc` from the DB runtime config
+- `private-state-cli channel recover-workspace --source rpc --output-raw`
+- observer raw-history import for state-recovery events
+- targeted observer RPC scans for bridge, participant, note-delivery, verifier, admin, and upgrade
+  events
+- optional `private-state-cli channel publish-workspace-mirror` and mirror upload when mirror
+  publishing is due
+
+The first observer worker run performs `recover-workspace --from-genesis --output-raw` when no raw
+history import state exists yet. Later runs use the CLI recovery index and append only new raw RPC
+history.
 
 ## Health
 
 ```text
 GET /api/health
 GET /api/admin/health
+GET /api/admin/indexer-config
+PUT /api/admin/indexer-config
+GET /api/admin/indexer-state
 ```
 
 `/api/health` is public liveness. `/api/admin/health` requires
 `Authorization: Bearer <ADMIN_TOKEN>` and checks DB connectivity plus required environment
 presence.
+
+Example runtime config update:
+
+```bash
+curl -X PUT "$BASE_URL/api/admin/indexer-config" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "rpcUrl": "https://...",
+    "rpcProvider": "ankr",
+    "observerSyncIntervalSeconds": 3600,
+    "mirrorPublishIntervalSeconds": 86400,
+    "observerBatchSize": 2000,
+    "observerConfirmations": 12,
+    "mirrorPublishAccount": "the-great-first-channel"
+  }'
+```

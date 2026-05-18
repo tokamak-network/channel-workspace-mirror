@@ -1,0 +1,198 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { loadLocalEnv } from "../lib/env";
+import {
+  getIndexerRunState,
+  isDue,
+  requireIndexerRuntimeConfig,
+  updateIndexerRunState,
+} from "../lib/indexer/config";
+import { validateMirrorUploadDirectory } from "../lib/manifest";
+import { publishMirrorUpload } from "../lib/publish";
+import { getSql } from "../lib/db";
+import { DEFAULT_OBSERVER_CHANNEL } from "../lib/observer/config";
+import { syncObserverChannel } from "../lib/observer/sync";
+
+loadLocalEnv();
+
+type RecoverResult = {
+  recoveryLastScannedBlock?: string | number;
+  rpcCallHistory?: {
+    historyDir?: string;
+  } | null;
+};
+
+async function main() {
+  const channel = DEFAULT_OBSERVER_CHANNEL;
+  const config = await requireIndexerRuntimeConfig(channel.slug);
+  const state = await getIndexerRunState(channel.slug);
+  const now = new Date();
+  const observerDue = config.observer_enabled
+    && isDue(state?.last_observer_run_at ?? null, config.observer_sync_interval_seconds, now);
+  const mirrorDue = config.mirror_enabled
+    && isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
+
+  if (!observerDue && !mirrorDue) {
+    console.log(JSON.stringify({ ok: true, skipped: true, reason: "not_due" }, null, 2));
+    return;
+  }
+
+  try {
+    await configurePrivateStateCli(config);
+    const rawHistoryBootstrapped = observerDue ? await hasRawHistoryImportState(channel.chainId, channel.channelId) : true;
+    const recovery = observerDue || mirrorDue ? runRecoverWorkspace(channel.name, !rawHistoryBootstrapped) : null;
+    const rawHistoryDir = recovery?.rpcCallHistory?.historyDir ?? null;
+
+    let observer = null;
+    if (observerDue) {
+      await updateIndexerRunState(channel.slug, { observerRunAt: now, rawHistoryDir });
+      observer = await syncObserverChannel(channel, {
+        rpcUrl: config.rpc_url,
+        rawHistoryDir,
+        batchSize: config.observer_batch_size,
+        confirmations: BigInt(config.observer_confirmations),
+      });
+      await updateIndexerRunState(channel.slug, {
+        observerSuccessAt: new Date(),
+        rawHistoryDir,
+        error: null,
+      });
+    }
+
+    let mirror = null;
+    if (mirrorDue) {
+      if (!config.mirror_publish_account) {
+        throw new Error("mirrorPublishAccount is required when mirror publishing is enabled.");
+      }
+      await updateIndexerRunState(channel.slug, { mirrorRunAt: now, rawHistoryDir });
+      mirror = await publishMirror({ channelName: channel.name, account: config.mirror_publish_account, outputDir: config.mirror_output_dir });
+      await updateIndexerRunState(channel.slug, {
+        mirrorSuccessAt: new Date(),
+        rawHistoryDir,
+        checkpointBlock: mirror.checkpointBlock,
+        error: null,
+      });
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      recoveryLastScannedBlock: recovery?.recoveryLastScannedBlock ?? null,
+      rawHistoryDir,
+      observer,
+      mirror,
+    }, null, 2));
+  } catch (error) {
+    await updateIndexerRunState(channel.slug, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+async function configurePrivateStateCli(config: Awaited<ReturnType<typeof requireIndexerRuntimeConfig>>) {
+  run("private-state-cli", ["install", "--read-only"]);
+  const rpcArgs = ["set", "rpc", "--network", "mainnet", "--rpc-url", config.rpc_url];
+  if (config.rpc_provider) {
+    rpcArgs.push("--provider", config.rpc_provider);
+  }
+  if (config.log_requests_per_second !== null) {
+    rpcArgs.push("--log-requests-per-second", String(config.log_requests_per_second));
+  }
+  if (config.block_range_cap !== null) {
+    rpcArgs.push("--block-range-cap", String(config.block_range_cap));
+  }
+  run("private-state-cli", rpcArgs);
+}
+
+function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
+  const result = run("private-state-cli", [
+    "channel",
+    "recover-workspace",
+    "--channel-name",
+    channelName,
+    "--network",
+    "mainnet",
+    "--source",
+    "rpc",
+    ...(fromGenesis ? ["--from-genesis"] : []),
+    "--output-raw",
+  ], { capture: true });
+  return parseLastJsonObject(result.stdout) as RecoverResult;
+}
+
+async function hasRawHistoryImportState(chainId: number, channelId: string) {
+  const sql = getSql();
+  const rows = await sql`
+    select 1 as exists
+    from observer_raw_history_import_state
+    where chain_id = ${String(chainId)}::bigint
+      and channel_id = ${channelId}
+    limit 1
+  ` as { exists: number }[];
+  return rows.length > 0;
+}
+
+async function publishMirror({
+  channelName,
+  account,
+  outputDir,
+}: {
+  channelName: string;
+  account: string;
+  outputDir: string | null;
+}) {
+  const targetDir = outputDir ?? path.join(os.tmpdir(), `${channelName}-mirror-public`);
+  fs.rmSync(targetDir, { recursive: true, force: true });
+  run("private-state-cli", [
+    "channel",
+    "publish-workspace-mirror",
+    "--channel-name",
+    channelName,
+    "--network",
+    "mainnet",
+    "--account",
+    account,
+    "--output",
+    targetDir,
+  ]);
+  const upload = await validateMirrorUploadDirectory(targetDir);
+  const result = await publishMirrorUpload(upload);
+  return {
+    outputDir: targetDir,
+    checkpointBlock: upload.manifest.checkpoint.recoveryLastScannedBlock,
+    publish: result,
+  };
+}
+
+function run(command: string, args: string[], options: { capture?: boolean } = {}) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
+  });
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim();
+    throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}${stderr ? `: ${stderr}` : ""}`);
+  }
+  return {
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+  };
+}
+
+function parseLastJsonObject(stdout: string) {
+  const trimmed = stdout.trim();
+  const start = trimmed.lastIndexOf("\n{");
+  const jsonText = start >= 0 ? trimmed.slice(start + 1) : trimmed;
+  try {
+    return JSON.parse(jsonText);
+  } catch (error) {
+    throw new Error(`Unable to parse private-state-cli JSON output: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+  process.exitCode = 1;
+});

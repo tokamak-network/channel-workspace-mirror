@@ -12,6 +12,7 @@
     "migrate": "tsx scripts/migrate.ts",
     "upload:local": "tsx scripts/upload-local.ts",
     "observer:sync": "tsx scripts/sync-observer.ts",
+    "indexer:run": "tsx scripts/run-indexer.ts",
     "cleanup:dry-run": "tsx scripts/cleanup.ts"
   },
   "dependencies": {

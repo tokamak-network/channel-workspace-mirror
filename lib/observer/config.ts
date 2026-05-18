@@ -50,29 +50,3 @@ export const DEFAULT_OBSERVER_CHANNEL: ObserverChannelConfig = {
     "https://github.com/tokamak-network/Tokamak-zk-EVM-contracts/tree/main/bridge/deployments",
   adminWallet: "0x850dD0721B93D455b55bdf1324595fA1BD2B3ce7",
 };
-
-export function getObserverRpcUrl() {
-  const rpcUrl = process.env.OBSERVER_RPC_URL ?? process.env.RPC_URL;
-  if (!rpcUrl) {
-    throw new Error("OBSERVER_RPC_URL or RPC_URL is required for observer sync.");
-  }
-  return rpcUrl;
-}
-
-export function getObserverBatchSize() {
-  const raw = process.env.OBSERVER_SYNC_BATCH_SIZE ?? process.env.RPC_BLOCK_RANGE_CAP ?? "2000";
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new Error("OBSERVER_SYNC_BATCH_SIZE must be a positive integer.");
-  }
-  return value;
-}
-
-export function getObserverConfirmations() {
-  const raw = process.env.OBSERVER_CONFIRMATIONS ?? "12";
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error("OBSERVER_CONFIRMATIONS must be a non-negative integer.");
-  }
-  return BigInt(value);
-}
