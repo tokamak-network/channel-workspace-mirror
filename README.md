@@ -32,7 +32,7 @@ DATABASE_URL=...
 Required for the admin health endpoint:
 
 ```text
-MIRROR_ADMIN_TOKEN=...
+ADMIN_TOKEN=...
 ```
 
 ## Setup
@@ -125,5 +125,5 @@ GET /api/admin/health
 ```
 
 `/api/health` is public liveness. `/api/admin/health` requires
-`Authorization: Bearer <MIRROR_ADMIN_TOKEN>` and checks DB connectivity plus required environment
+`Authorization: Bearer <ADMIN_TOKEN>` and checks DB connectivity plus required environment
 presence.

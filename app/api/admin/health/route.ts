@@ -1,19 +1,11 @@
 import { NextResponse } from "next/server";
+import { hasAdminToken, isAdminAuthorized } from "@/lib/admin-auth";
 import { getDatabaseHealth } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-function isAuthorized(request: Request) {
-  const token = process.env.MIRROR_ADMIN_TOKEN;
-  if (!token) {
-    return false;
-  }
-  const authorization = request.headers.get("authorization") ?? "";
-  return authorization === `Bearer ${token}`;
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!isAdminAuthorized(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,7 +13,7 @@ export async function GET(request: Request) {
   const checks = {
     database: db.ok,
     blobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-    adminToken: Boolean(process.env.MIRROR_ADMIN_TOKEN),
+    adminToken: hasAdminToken(),
   };
   const ok = Object.values(checks).every(Boolean);
 
