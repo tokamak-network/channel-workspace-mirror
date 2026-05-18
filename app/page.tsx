@@ -7,6 +7,9 @@ export default function Home() {
           This deployment serves channel workspace mirror artifacts through the stable protocol
           paths under <code>/.well-known/tokamak-private-state/channel-workspace</code>.
         </p>
+        <p className="home-link">
+          <a href="/observer/the-great-first-channel">Open the-great-first-channel observer</a>
+        </p>
       </section>
     </main>
   );

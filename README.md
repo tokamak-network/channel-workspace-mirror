@@ -89,6 +89,34 @@ npm run cleanup:dry-run
 By default it reports publish rows older than 30 days that are outside the latest two checkpoints
 for each channel. It does not delete Blob objects or DB rows.
 
+## Public Channel Observer
+
+The same deployment can also expose a public observer for indexed L1 channel activity. The observer
+is a read layer over public data; it does not deanonymize private note transfers.
+
+```text
+GET /observer/the-great-first-channel
+GET /api/observer/channels/the-great-first-channel
+GET /api/observer/channels/the-great-first-channel/events
+```
+
+The observer uses separate tables from the mirror artifact history:
+
+- `observer_channels`
+- `observer_sync_state`
+- `observer_events`
+
+Run the sync job from an operator environment with DB credentials and an Ethereum RPC URL:
+
+```bash
+OBSERVER_RPC_URL=https://... npm run observer:sync
+```
+
+The sync job indexes public L1 events for the configured channel and stores decoded event rows in
+Neon. Vercel serves the observer page and API from the indexed rows; long-running indexing should
+run as a cron, worker, GitHub Actions job, or local `launchd` job rather than inside a request
+handler.
+
 ## Health
 
 ```text
