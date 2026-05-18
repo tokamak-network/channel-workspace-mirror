@@ -1,6 +1,3 @@
-alter table observer_events
-  add column if not exists ingestion_sources jsonb not null default '[]'::jsonb;
-
 create table if not exists observer_event_sync_state (
   chain_id bigint not null,
   channel_id text not null,
@@ -14,34 +11,21 @@ create table if not exists observer_event_sync_state (
 create table if not exists observer_raw_history_import_state (
   chain_id bigint not null,
   channel_id text not null,
-  file_path text not null,
+  file_key text not null,
   entries_processed integer not null default 0,
   updated_at timestamptz not null default now(),
-  primary key (chain_id, channel_id, file_path)
-);
-
-create table if not exists observer_blocks (
-  chain_id bigint not null,
-  block_number bigint not null,
-  block_hash text not null,
-  block_timestamp timestamptz not null,
-  updated_at timestamptz not null default now(),
-  primary key (chain_id, block_number)
+  primary key (chain_id, channel_id, file_key)
 );
 
 create table if not exists indexer_runtime_config (
   channel_slug text primary key,
   rpc_url text,
-  rpc_provider text,
   log_requests_per_second numeric,
   block_range_cap integer,
-  mirror_enabled boolean not null default true,
-  observer_enabled boolean not null default true,
   mirror_publish_interval_seconds integer not null default 86400,
   observer_sync_interval_seconds integer not null default 3600,
   observer_batch_size integer not null default 2000,
   mirror_publish_account text,
-  mirror_output_dir text,
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   constraint indexer_runtime_config_mirror_interval_positive

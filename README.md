@@ -191,7 +191,6 @@ curl -X PUT "$BASE_URL/api/admin/indexer-config" \
   -H "Content-Type: application/json" \
   --data '{
     "rpcUrl": "https://...",
-    "rpcProvider": "ankr",
     "observerSyncIntervalSeconds": 3600,
     "mirrorPublishIntervalSeconds": 86400,
     "mirrorPublishAccount": "the-great-first-channel"

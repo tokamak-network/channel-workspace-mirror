@@ -51,8 +51,6 @@ type RawHistoryEntry = {
   response?: unknown[];
 };
 
-const CLI_RAW_RECOVERY_SOURCE = "cli_raw_recovery";
-const TARGETED_RPC_SOURCE = "observer_targeted_rpc";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const RAW_RECOVERY_EVENTS = new Set([
   "CurrentRootVectorObserved",
@@ -230,7 +228,8 @@ async function importRawRpcCallHistory({
     }
 
     const entries = Array.isArray(document.entries) ? document.entries : [];
-    let processed = await getRawHistoryEntriesProcessed(channel, filePath);
+    const fileKey = rawHistoryFileKey(filePath);
+    let processed = await getRawHistoryEntriesProcessed(channel, fileKey);
     if (processed > entries.length) {
       processed = 0;
     }
@@ -247,12 +246,12 @@ async function importRawRpcCallHistory({
       }
     }
 
-    const timestamps = await blockTimestamps(client, limiter, channel.chainId, decodedLogs);
+    const timestamps = await blockTimestamps(client, limiter, decodedLogs);
     for (const decoded of decodedLogs) {
-      await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null, CLI_RAW_RECOVERY_SOURCE);
+      await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null);
       imported += 1;
     }
-    await updateRawHistoryEntriesProcessed(channel, filePath, entries.length);
+    await updateRawHistoryEntriesProcessed(channel, fileKey, entries.length);
   }
   return imported;
 }
@@ -290,10 +289,10 @@ async function syncTargetedEvents({
         toBlock,
       }));
       const relevantLogs = decodeRelevantLogs(channel, logs);
-      const timestamps = await blockTimestamps(client, limiter, channel.chainId, relevantLogs);
+      const timestamps = await blockTimestamps(client, limiter, relevantLogs);
 
       for (const decoded of relevantLogs) {
-        await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null, TARGETED_RPC_SOURCE);
+        await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null);
         insertedOrUpdated += 1;
       }
 
@@ -311,25 +310,29 @@ function rawHistoryFiles(historyDir: string) {
     .sort();
 }
 
-async function getRawHistoryEntriesProcessed(channel: ObserverChannelConfig, filePath: string) {
+function rawHistoryFileKey(filePath: string) {
+  return path.basename(filePath);
+}
+
+async function getRawHistoryEntriesProcessed(channel: ObserverChannelConfig, fileKey: string) {
   const sql = getSql();
   const rows = await sql`
     select entries_processed
     from observer_raw_history_import_state
     where chain_id = ${String(channel.chainId)}::bigint
       and channel_id = ${channel.channelId}
-      and file_path = ${filePath}
+      and file_key = ${fileKey}
     limit 1
   ` as { entries_processed: number }[];
   return rows[0]?.entries_processed ?? 0;
 }
 
-async function updateRawHistoryEntriesProcessed(channel: ObserverChannelConfig, filePath: string, entriesProcessed: number) {
+async function updateRawHistoryEntriesProcessed(channel: ObserverChannelConfig, fileKey: string, entriesProcessed: number) {
   const sql = getSql();
   await sql`
-    insert into observer_raw_history_import_state (chain_id, channel_id, file_path, entries_processed, updated_at)
-    values (${String(channel.chainId)}::bigint, ${channel.channelId}, ${filePath}, ${String(entriesProcessed)}::integer, now())
-    on conflict (chain_id, channel_id, file_path) do update set
+    insert into observer_raw_history_import_state (chain_id, channel_id, file_key, entries_processed, updated_at)
+    values (${String(channel.chainId)}::bigint, ${channel.channelId}, ${fileKey}, ${String(entriesProcessed)}::integer, now())
+    on conflict (chain_id, channel_id, file_key) do update set
       entries_processed = excluded.entries_processed,
       updated_at = now()
   `;
@@ -411,10 +414,6 @@ export async function resetObserverAccumulatedScan(channel: ObserverChannelConfi
     delete from observer_events
     where chain_id = ${String(channel.chainId)}::bigint
       and channel_id = ${channel.channelId}
-  `;
-  await sql`
-    delete from observer_blocks
-    where chain_id = ${String(channel.chainId)}::bigint
   `;
 }
 
@@ -530,47 +529,15 @@ function jsonReplacer(_key: string, value: unknown) {
 async function blockTimestamps(
   client: ReturnType<typeof createPublicClient>,
   limiter: RpcRateLimiter,
-  chainId: number,
   logs: DecodedObserverLog[],
 ) {
   const timestamps = new Map<string, string>();
   const blockNumbers = [...new Set(logs.map((log) => log.blockNumber.toString()))];
-  const missing: bigint[] = [];
-  const sql = getSql();
-
-  for (const blockNumber of blockNumbers) {
-    const rows = await sql`
-      select block_timestamp
-      from observer_blocks
-      where chain_id = ${String(chainId)}::bigint
-        and block_number = ${blockNumber}::bigint
-      limit 1
-    ` as { block_timestamp: string }[];
-    if (rows[0]?.block_timestamp) {
-      timestamps.set(blockNumber, rows[0].block_timestamp);
-    } else {
-      missing.push(BigInt(blockNumber));
-    }
-  }
-
-  for (const blockNumber of missing) {
+  for (const blockNumberText of blockNumbers) {
+    const blockNumber = BigInt(blockNumberText);
     const block = await limitedRpc(limiter, () => client.getBlock({ blockNumber }));
     const timestamp = new Date(Number(block.timestamp) * 1000).toISOString();
     timestamps.set(blockNumber.toString(), timestamp);
-    await sql`
-      insert into observer_blocks (chain_id, block_number, block_hash, block_timestamp, updated_at)
-      values (
-        ${String(chainId)}::bigint,
-        ${blockNumber.toString()}::bigint,
-        ${block.hash ?? "0x"},
-        ${timestamp}::timestamptz,
-        now()
-      )
-      on conflict (chain_id, block_number) do update set
-        block_hash = excluded.block_hash,
-        block_timestamp = excluded.block_timestamp,
-        updated_at = now()
-    `;
   }
 
   return timestamps;
@@ -629,7 +596,6 @@ async function insertObserverEvent(
   channel: ObserverChannelConfig,
   log: DecodedObserverLog,
   blockTimestamp: string | null,
-  source: string,
 ) {
   const sql = getSql();
   await sql`
@@ -647,8 +613,7 @@ async function insertObserverEvent(
       event_group,
       decoded,
       raw_topics,
-      raw_data,
-      ingestion_sources
+      raw_data
     )
     values (
       ${String(channel.chainId)}::bigint,
@@ -664,8 +629,7 @@ async function insertObserverEvent(
       ${log.eventGroup},
       ${JSON.stringify(log.args)}::jsonb,
       ${JSON.stringify(log.topics)}::jsonb,
-      ${log.data},
-      ${JSON.stringify([source])}::jsonb
+      ${log.data}
     )
     on conflict (chain_id, channel_id, transaction_hash, log_index) do update set
       block_number = excluded.block_number,
@@ -677,11 +641,7 @@ async function insertObserverEvent(
       event_group = excluded.event_group,
       decoded = excluded.decoded,
       raw_topics = excluded.raw_topics,
-      raw_data = excluded.raw_data,
-      ingestion_sources = (
-        select jsonb_agg(distinct source_value)
-        from jsonb_array_elements_text(observer_events.ingestion_sources || excluded.ingestion_sources) as merged(source_value)
-      )
+      raw_data = excluded.raw_data
   `;
 }
 

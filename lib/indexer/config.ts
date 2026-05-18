@@ -3,15 +3,11 @@ import { getSql } from "../db";
 export type IndexerRuntimeConfig = {
   channel_slug: string;
   rpc_url: string | null;
-  rpc_provider: string | null;
   log_requests_per_second: string | null;
   block_range_cap: number | null;
-  mirror_enabled: boolean;
-  observer_enabled: boolean;
   mirror_publish_interval_seconds: number;
   observer_sync_interval_seconds: number;
   mirror_publish_account: string | null;
-  mirror_output_dir: string | null;
   updated_at: string;
   created_at: string;
 };
@@ -30,15 +26,11 @@ export type IndexerRunState = {
 
 export type IndexerRuntimeConfigInput = {
   rpcUrl?: string | null;
-  rpcProvider?: string | null;
   logRequestsPerSecond?: number | null;
   blockRangeCap?: number | null;
-  mirrorEnabled?: boolean;
-  observerEnabled?: boolean;
   mirrorPublishIntervalSeconds?: number;
   observerSyncIntervalSeconds?: number;
   mirrorPublishAccount?: string | null;
-  mirrorOutputDir?: string | null;
 };
 
 export async function getIndexerRuntimeConfig(channelSlug: string) {
@@ -70,42 +62,30 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
     insert into indexer_runtime_config (
       channel_slug,
       rpc_url,
-      rpc_provider,
       log_requests_per_second,
       block_range_cap,
-      mirror_enabled,
-      observer_enabled,
       mirror_publish_interval_seconds,
       observer_sync_interval_seconds,
       mirror_publish_account,
-      mirror_output_dir,
       updated_at
     )
     values (
       ${channelSlug},
       ${input.rpcUrl ?? null},
-      ${input.rpcProvider ?? null},
       ${input.logRequestsPerSecond == null ? null : String(input.logRequestsPerSecond)}::numeric,
       ${input.blockRangeCap == null ? null : String(input.blockRangeCap)}::integer,
-      ${input.mirrorEnabled ?? true},
-      ${input.observerEnabled ?? true},
       ${String(input.mirrorPublishIntervalSeconds ?? 86400)}::integer,
       ${String(input.observerSyncIntervalSeconds ?? 3600)}::integer,
       ${input.mirrorPublishAccount ?? null},
-      ${input.mirrorOutputDir ?? null},
       now()
     )
     on conflict (channel_slug) do update set
       rpc_url = excluded.rpc_url,
-      rpc_provider = excluded.rpc_provider,
       log_requests_per_second = excluded.log_requests_per_second,
       block_range_cap = excluded.block_range_cap,
-      mirror_enabled = excluded.mirror_enabled,
-      observer_enabled = excluded.observer_enabled,
       mirror_publish_interval_seconds = excluded.mirror_publish_interval_seconds,
       observer_sync_interval_seconds = excluded.observer_sync_interval_seconds,
       mirror_publish_account = excluded.mirror_publish_account,
-      mirror_output_dir = excluded.mirror_output_dir,
       updated_at = now()
     returning *
   ` as IndexerRuntimeConfig[];

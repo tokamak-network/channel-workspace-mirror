@@ -33,10 +33,8 @@ async function main() {
   const config = await requireIndexerRuntimeConfig(channel.slug);
   const state = await getIndexerRunState(channel.slug);
   const now = new Date();
-  const observerDue = config.observer_enabled
-    && isDue(state?.last_observer_run_at ?? null, config.observer_sync_interval_seconds, now);
-  const mirrorDue = config.mirror_enabled
-    && isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
+  const observerDue = isDue(state?.last_observer_run_at ?? null, config.observer_sync_interval_seconds, now);
+  const mirrorDue = isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
 
   if (!observerDue && !mirrorDue) {
     console.log(JSON.stringify({ ok: true, skipped: true, reason: "not_due" }, null, 2));
@@ -76,7 +74,7 @@ async function main() {
         throw new Error("mirrorPublishAccount is required when mirror publishing is enabled.");
       }
       await updateIndexerRunState(channel.slug, { mirrorRunAt: now, rawHistoryDir });
-      mirror = await publishMirror({ channelName: channel.name, account: config.mirror_publish_account, outputDir: config.mirror_output_dir });
+      mirror = await publishMirror({ channelName: channel.name, account: config.mirror_publish_account });
       await updateIndexerRunState(channel.slug, {
         mirrorSuccessAt: new Date(),
         rawHistoryDir,
@@ -219,13 +217,11 @@ function isPositiveBlockNumber(value: unknown) {
 async function publishMirror({
   channelName,
   account,
-  outputDir,
 }: {
   channelName: string;
   account: string;
-  outputDir: string | null;
 }) {
-  const targetDir = outputDir ?? path.join(os.tmpdir(), `${channelName}-mirror-public`);
+  const targetDir = path.join(os.tmpdir(), `${channelName}-mirror-public`);
   fs.rmSync(targetDir, { recursive: true, force: true });
   run("private-state-cli", [
     "channel",
