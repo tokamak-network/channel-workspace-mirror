@@ -11,7 +11,6 @@ import {
 } from "../lib/indexer/config";
 import { validateMirrorUploadDirectory } from "../lib/manifest";
 import { publishMirrorUpload } from "../lib/publish";
-import { getSql } from "../lib/db";
 import { DEFAULT_OBSERVER_CHANNEL } from "../lib/observer/config";
 import { syncObserverChannel } from "../lib/observer/sync";
 
@@ -41,8 +40,8 @@ async function main() {
 
   try {
     await configurePrivateStateCli(config);
-    const rawHistoryBootstrapped = observerDue ? await hasRawHistoryImportState(channel.chainId, channel.channelId) : true;
-    const recovery = observerDue || mirrorDue ? runRecoverWorkspace(channel.name, !rawHistoryBootstrapped) : null;
+    const localWorkspaceRecovered = hasLocalRecoveredWorkspace(channel.name);
+    const recovery = observerDue || mirrorDue ? runRecoverWorkspace(channel.name, !localWorkspaceRecovered) : null;
     const rawHistoryDir = recovery?.rpcCallHistory?.historyDir ?? null;
 
     let observer = null;
@@ -157,16 +156,35 @@ function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
   return parseLastJsonObject(result.stdout) as RecoverResult;
 }
 
-async function hasRawHistoryImportState(chainId: number, channelId: string) {
-  const sql = getSql();
-  const rows = await sql`
-    select 1 as exists
-    from observer_raw_history_import_state
-    where chain_id = ${String(chainId)}::bigint
-      and channel_id = ${channelId}
-    limit 1
-  ` as { exists: number }[];
-  return rows.length > 0;
+function hasLocalRecoveredWorkspace(channelName: string) {
+  const channelDir = path.join(os.homedir(), "tokamak-private-channels", "workspace", "mainnet", channelName, "channel");
+  const workspacePath = path.join(channelDir, "workspace.json");
+  const requiredFiles = [
+    workspacePath,
+    path.join(channelDir, "current", "state_snapshot.json"),
+    path.join(channelDir, "current", "block_info.json"),
+  ];
+  if (!requiredFiles.every((file) => fs.existsSync(file))) {
+    return false;
+  }
+  try {
+    const workspace = JSON.parse(fs.readFileSync(workspacePath, "utf8")) as {
+      recoverySource?: string;
+      recoveryLastScannedBlock?: unknown;
+      recoveryRootVectorHash?: unknown;
+    };
+    return workspace.recoverySource === "rpc"
+      && isPositiveBlockNumber(workspace.recoveryLastScannedBlock)
+      && typeof workspace.recoveryRootVectorHash === "string"
+      && workspace.recoveryRootVectorHash.startsWith("0x");
+  } catch {
+    return false;
+  }
+}
+
+function isPositiveBlockNumber(value: unknown) {
+  const parsed = typeof value === "bigint" ? value : BigInt(String(value));
+  return parsed > 0n;
 }
 
 async function publishMirror({

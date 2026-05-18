@@ -143,9 +143,9 @@ It performs the operator flow in this order:
 - optional `private-state-cli channel publish-workspace-mirror` and mirror upload when mirror
   publishing is due
 
-The first observer worker run performs `recover-workspace --from-genesis --output-raw` when no raw
-history import state exists yet. Later runs use the CLI recovery index and append only new raw RPC
-history.
+The first worker run on a persistent host performs `recover-workspace --from-genesis --output-raw`
+when the local CLI workspace has no recovered channel snapshot yet. Later runs use that host's CLI
+recovery index and append only new raw RPC history.
 
 Observer RPC calls use only the RPC scan parameters imported from the private-state CLI
 `rpc-config.env`. `LOG_REQUESTS_PER_SECOND` is applied to observer `eth_blockNumber`,
