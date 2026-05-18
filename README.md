@@ -150,7 +150,9 @@ recovery index and append only new raw RPC history.
 Observer RPC calls use only the RPC scan parameters imported from the private-state CLI
 `rpc-config.env`. `LOG_REQUESTS_PER_SECOND` is applied to observer `eth_blockNumber`,
 `eth_getLogs`, and `eth_getBlockByNumber` calls, and every observer `eth_getLogs` request scans
-exactly one `RPC_BLOCK_RANGE_CAP` block window except for the final shorter tail range.
+exactly one `RPC_BLOCK_RANGE_CAP` block window except for the final shorter tail range. The observer
+does not keep a separate confirmation-depth setting. If the CLI detects that incremental recovery is
+not trustworthy, the worker retries recovery from genesis and resets accumulated observer scan state.
 
 ## Persistent Worker
 
@@ -192,7 +194,6 @@ curl -X PUT "$BASE_URL/api/admin/indexer-config" \
     "rpcProvider": "ankr",
     "observerSyncIntervalSeconds": 3600,
     "mirrorPublishIntervalSeconds": 86400,
-    "observerConfirmations": 12,
     "mirrorPublishAccount": "the-great-first-channel"
   }'
 ```

@@ -12,7 +12,7 @@ import {
 import { validateMirrorUploadDirectory } from "../lib/manifest";
 import { publishMirrorUpload } from "../lib/publish";
 import { DEFAULT_OBSERVER_CHANNEL } from "../lib/observer/config";
-import { syncObserverChannel } from "../lib/observer/sync";
+import { resetObserverAccumulatedScan, syncObserverChannel } from "../lib/observer/sync";
 
 loadLocalEnv();
 
@@ -21,6 +21,11 @@ type RecoverResult = {
   rpcCallHistory?: {
     historyDir?: string;
   } | null;
+};
+
+type WorkspaceRecovery = {
+  result: RecoverResult;
+  fromGenesis: boolean;
 };
 
 async function main() {
@@ -41,11 +46,14 @@ async function main() {
   try {
     await configurePrivateStateCli(config);
     const localWorkspaceRecovered = hasLocalRecoveredWorkspace(channel.name);
-    const recovery = observerDue || mirrorDue ? runRecoverWorkspace(channel.name, !localWorkspaceRecovered) : null;
-    const rawHistoryDir = recovery?.rpcCallHistory?.historyDir ?? null;
+    const recovery = observerDue || mirrorDue ? recoverWorkspace(channel.name, !localWorkspaceRecovered) : null;
+    const rawHistoryDir = recovery?.result.rpcCallHistory?.historyDir ?? null;
 
     let observer = null;
     if (observerDue) {
+      if (recovery?.fromGenesis) {
+        await resetObserverAccumulatedScan(channel);
+      }
       const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
       const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
       await updateIndexerRunState(channel.slug, { observerRunAt: now, rawHistoryDir });
@@ -54,7 +62,6 @@ async function main() {
         rawHistoryDir,
         blockRangeCap,
         logRequestsPerSecond,
-        confirmations: BigInt(config.observer_confirmations),
       });
       await updateIndexerRunState(channel.slug, {
         observerSuccessAt: new Date(),
@@ -80,7 +87,8 @@ async function main() {
 
     console.log(JSON.stringify({
       ok: true,
-      recoveryLastScannedBlock: recovery?.recoveryLastScannedBlock ?? null,
+      recoveryLastScannedBlock: recovery?.result.recoveryLastScannedBlock ?? null,
+      recoveryFromGenesis: recovery?.fromGenesis ?? null,
       rawHistoryDir,
       observer,
       mirror,
@@ -154,6 +162,27 @@ function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
     "--json",
   ], { capture: true });
   return parseLastJsonObject(result.stdout) as RecoverResult;
+}
+
+function recoverWorkspace(channelName: string, fromGenesis: boolean): WorkspaceRecovery {
+  if (fromGenesis) {
+    return {
+      result: runRecoverWorkspace(channelName, true),
+      fromGenesis: true,
+    };
+  }
+  try {
+    return {
+      result: runRecoverWorkspace(channelName, false),
+      fromGenesis: false,
+    };
+  } catch (error) {
+    console.warn(`Incremental workspace recovery failed; retrying from genesis: ${error instanceof Error ? error.message : String(error)}`);
+    return {
+      result: runRecoverWorkspace(channelName, true),
+      fromGenesis: true,
+    };
+  }
 }
 
 function hasLocalRecoveredWorkspace(channelName: string) {

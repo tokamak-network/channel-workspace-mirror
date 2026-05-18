@@ -10,7 +10,6 @@ export type IndexerRuntimeConfig = {
   observer_enabled: boolean;
   mirror_publish_interval_seconds: number;
   observer_sync_interval_seconds: number;
-  observer_confirmations: number;
   mirror_publish_account: string | null;
   mirror_output_dir: string | null;
   updated_at: string;
@@ -38,7 +37,6 @@ export type IndexerRuntimeConfigInput = {
   observerEnabled?: boolean;
   mirrorPublishIntervalSeconds?: number;
   observerSyncIntervalSeconds?: number;
-  observerConfirmations?: number;
   mirrorPublishAccount?: string | null;
   mirrorOutputDir?: string | null;
 };
@@ -79,7 +77,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       observer_enabled,
       mirror_publish_interval_seconds,
       observer_sync_interval_seconds,
-      observer_confirmations,
       mirror_publish_account,
       mirror_output_dir,
       updated_at
@@ -94,7 +91,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       ${input.observerEnabled ?? true},
       ${String(input.mirrorPublishIntervalSeconds ?? 86400)}::integer,
       ${String(input.observerSyncIntervalSeconds ?? 3600)}::integer,
-      ${String(input.observerConfirmations ?? 12)}::integer,
       ${input.mirrorPublishAccount ?? null},
       ${input.mirrorOutputDir ?? null},
       now()
@@ -108,7 +104,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       observer_enabled = excluded.observer_enabled,
       mirror_publish_interval_seconds = excluded.mirror_publish_interval_seconds,
       observer_sync_interval_seconds = excluded.observer_sync_interval_seconds,
-      observer_confirmations = excluded.observer_confirmations,
       mirror_publish_account = excluded.mirror_publish_account,
       mirror_output_dir = excluded.mirror_output_dir,
       updated_at = now()
@@ -192,7 +187,6 @@ export function isDue(lastRunAt: string | null, intervalSeconds: number, now = n
 function validateConfigInput(input: IndexerRuntimeConfigInput) {
   assertOptionalPositiveInteger(input.mirrorPublishIntervalSeconds, "mirrorPublishIntervalSeconds");
   assertOptionalPositiveInteger(input.observerSyncIntervalSeconds, "observerSyncIntervalSeconds");
-  assertOptionalNonnegativeInteger(input.observerConfirmations, "observerConfirmations");
   assertOptionalPositiveInteger(input.blockRangeCap, "blockRangeCap");
   if (input.logRequestsPerSecond != null && (!Number.isFinite(input.logRequestsPerSecond) || input.logRequestsPerSecond <= 0)) {
     throw new Error("logRequestsPerSecond must be a positive number.");
@@ -205,14 +199,5 @@ function assertOptionalPositiveInteger(value: number | undefined | null, name: s
   }
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
-  }
-}
-
-function assertOptionalNonnegativeInteger(value: number | undefined | null, name: string) {
-  if (value == null) {
-    return;
-  }
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error(`${name} must be a non-negative integer.`);
   }
 }

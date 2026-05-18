@@ -25,7 +25,6 @@ type ObserverSyncOptions = {
   rawHistoryDir?: string | null;
   blockRangeCap: number;
   logRequestsPerSecond: number;
-  confirmations: bigint;
 };
 
 type DecodedObserverLog = {
@@ -90,7 +89,6 @@ export async function syncDefaultObserverChannel(rawHistoryDir?: string | null):
     rawHistoryDir,
     blockRangeCap,
     logRequestsPerSecond,
-    confirmations: BigInt(runtime.observer_confirmations),
   });
 }
 
@@ -106,7 +104,6 @@ export async function syncObserverChannel(
   });
   const limiter = createRpcRateLimiter(options.logRequestsPerSecond);
   const latestBlock = await limitedRpc(limiter, () => client.getBlockNumber());
-  const safeLatestBlock = latestBlock > options.confirmations ? latestBlock - options.confirmations : 0n;
 
   const rawImported = options.rawHistoryDir
     ? await importRawRpcCallHistory({ channel, client, limiter, historyDir: options.rawHistoryDir })
@@ -115,12 +112,11 @@ export async function syncObserverChannel(
     channel,
     client,
     limiter,
-    safeLatestBlock,
     latestBlock,
     blockRangeCap: BigInt(options.blockRangeCap),
   });
 
-  await updateSummarySyncState(channel, safeLatestBlock, latestBlock);
+  await updateSummarySyncState(channel, latestBlock, latestBlock);
   await sql`select 1`;
   return {
     channel: channel.slug,
@@ -265,14 +261,12 @@ async function syncTargetedEvents({
   channel,
   client,
   limiter,
-  safeLatestBlock,
   latestBlock,
   blockRangeCap,
 }: {
   channel: ObserverChannelConfig;
   client: ReturnType<typeof createPublicClient>;
   limiter: RpcRateLimiter;
-  safeLatestBlock: bigint;
   latestBlock: bigint;
   blockRangeCap: bigint;
 }) {
@@ -281,14 +275,14 @@ async function syncTargetedEvents({
     const syncKey = `targeted:${target.addressKey}:${target.eventName}`;
     const state = await getEventSyncState(channel, syncKey);
     const fromBlock = state?.last_scanned_block ? BigInt(state.last_scanned_block) + 1n : channel.genesisBlock;
-    if (fromBlock > safeLatestBlock) {
+    if (fromBlock > latestBlock) {
       await updateEventSyncState(channel, syncKey, state?.last_scanned_block ? BigInt(state.last_scanned_block) : channel.genesisBlock - 1n, latestBlock);
       continue;
     }
 
     let cursor = fromBlock;
-    while (cursor <= safeLatestBlock) {
-      const toBlock = minBigInt(cursor + blockRangeCap - 1n, safeLatestBlock);
+    while (cursor <= latestBlock) {
+      const toBlock = minBigInt(cursor + blockRangeCap - 1n, latestBlock);
       const logs = await limitedRpc(limiter, () => client.getLogs({
         address: addressForTarget(channel, target.addressKey),
         event: abiEvent(target.eventName),
@@ -393,6 +387,34 @@ async function updateSummarySyncState(channel: ObserverChannelConfig, lastScanne
       last_scanned_block = excluded.last_scanned_block,
       latest_block = excluded.latest_block,
       updated_at = now()
+  `;
+}
+
+export async function resetObserverAccumulatedScan(channel: ObserverChannelConfig) {
+  const sql = getSql();
+  await sql`
+    delete from observer_raw_history_import_state
+    where chain_id = ${String(channel.chainId)}::bigint
+      and channel_id = ${channel.channelId}
+  `;
+  await sql`
+    delete from observer_event_sync_state
+    where chain_id = ${String(channel.chainId)}::bigint
+      and channel_id = ${channel.channelId}
+  `;
+  await sql`
+    delete from observer_sync_state
+    where chain_id = ${String(channel.chainId)}::bigint
+      and channel_id = ${channel.channelId}
+  `;
+  await sql`
+    delete from observer_events
+    where chain_id = ${String(channel.chainId)}::bigint
+      and channel_id = ${channel.channelId}
+  `;
+  await sql`
+    delete from observer_blocks
+    where chain_id = ${String(channel.chainId)}::bigint
   `;
 }
 

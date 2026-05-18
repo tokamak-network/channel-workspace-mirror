@@ -40,7 +40,6 @@ create table if not exists indexer_runtime_config (
   mirror_publish_interval_seconds integer not null default 86400,
   observer_sync_interval_seconds integer not null default 3600,
   observer_batch_size integer not null default 2000,
-  observer_confirmations integer not null default 12,
   mirror_publish_account text,
   mirror_output_dir text,
   updated_at timestamptz not null default now(),
@@ -50,9 +49,7 @@ create table if not exists indexer_runtime_config (
   constraint indexer_runtime_config_observer_interval_positive
     check (observer_sync_interval_seconds > 0),
   constraint indexer_runtime_config_batch_size_positive
-    check (observer_batch_size > 0),
-  constraint indexer_runtime_config_confirmations_nonnegative
-    check (observer_confirmations >= 0)
+    check (observer_batch_size > 0)
 );
 
 create table if not exists indexer_run_state (
