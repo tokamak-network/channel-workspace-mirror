@@ -23,7 +23,6 @@ type SyncResult = {
 type ObserverSyncOptions = {
   rpcUrl: string;
   rawHistoryDir?: string | null;
-  batchSize: number;
   blockRangeCap: number;
   logRequestsPerSecond: number;
   confirmations: bigint;
@@ -89,7 +88,6 @@ export async function syncDefaultObserverChannel(rawHistoryDir?: string | null):
   return syncObserverChannel(DEFAULT_OBSERVER_CHANNEL, {
     rpcUrl: runtime.rpc_url,
     rawHistoryDir,
-    batchSize: runtime.observer_batch_size,
     blockRangeCap,
     logRequestsPerSecond,
     confirmations: BigInt(runtime.observer_confirmations),
@@ -119,7 +117,7 @@ export async function syncObserverChannel(
     limiter,
     safeLatestBlock,
     latestBlock,
-    blockRangeCap: BigInt(Math.min(options.batchSize, options.blockRangeCap)),
+    blockRangeCap: BigInt(options.blockRangeCap),
   });
 
   await updateSummarySyncState(channel, safeLatestBlock, latestBlock);
@@ -564,7 +562,7 @@ function createRpcRateLimiter(requestsPerSecond: number): RpcRateLimiter {
   if (!Number.isFinite(requestsPerSecond) || requestsPerSecond <= 0) {
     throw new Error("logRequestsPerSecond must be a positive number.");
   }
-  const intervalMs = Math.ceil(1000 / requestsPerSecond);
+  const intervalMs = 1000 / requestsPerSecond;
   let nextAvailableAt = 0;
   let queue = Promise.resolve();
 
@@ -572,11 +570,12 @@ function createRpcRateLimiter(requestsPerSecond: number): RpcRateLimiter {
     wait() {
       const scheduled = queue.then(async () => {
         const now = Date.now();
-        const delayMs = Math.max(0, nextAvailableAt - now);
+        const scheduledAt = Math.max(now, nextAvailableAt);
+        const delayMs = scheduledAt - now;
         if (delayMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
-        nextAvailableAt = Date.now() + intervalMs;
+        nextAvailableAt = scheduledAt + intervalMs;
       });
       queue = scheduled.catch(() => undefined);
       return scheduled;

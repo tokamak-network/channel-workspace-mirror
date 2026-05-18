@@ -143,10 +143,10 @@ The first observer worker run performs `recover-workspace --from-genesis --outpu
 history import state exists yet. Later runs use the CLI recovery index and append only new raw RPC
 history.
 
-Observer RPC calls are rate-limited by the runtime config. `log_requests_per_second` is applied to
-observer `eth_blockNumber`, `eth_getLogs`, and `eth_getBlockByNumber` calls, and every observer
-`eth_getLogs` request uses `min(observerBatchSize, blockRangeCap)` so the configured block range cap
-is never exceeded.
+Observer RPC calls use only the RPC scan parameters imported from the private-state CLI
+`rpc-config.env`. `LOG_REQUESTS_PER_SECOND` is applied to observer `eth_blockNumber`,
+`eth_getLogs`, and `eth_getBlockByNumber` calls, and every observer `eth_getLogs` request scans
+exactly one `RPC_BLOCK_RANGE_CAP` block window except for the final shorter tail range.
 
 ## Health
 
@@ -173,7 +173,6 @@ curl -X PUT "$BASE_URL/api/admin/indexer-config" \
     "rpcProvider": "ankr",
     "observerSyncIntervalSeconds": 3600,
     "mirrorPublishIntervalSeconds": 86400,
-    "observerBatchSize": 2000,
     "observerConfirmations": 12,
     "mirrorPublishAccount": "the-great-first-channel"
   }'

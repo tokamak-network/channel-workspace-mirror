@@ -53,7 +53,6 @@ async function main() {
       observer = await syncObserverChannel(channel, {
         rpcUrl: config.rpc_url,
         rawHistoryDir,
-        batchSize: config.observer_batch_size,
         blockRangeCap,
         logRequestsPerSecond,
         confirmations: BigInt(config.observer_confirmations),

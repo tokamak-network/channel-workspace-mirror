@@ -10,7 +10,6 @@ export type IndexerRuntimeConfig = {
   observer_enabled: boolean;
   mirror_publish_interval_seconds: number;
   observer_sync_interval_seconds: number;
-  observer_batch_size: number;
   observer_confirmations: number;
   mirror_publish_account: string | null;
   mirror_output_dir: string | null;
@@ -39,7 +38,6 @@ export type IndexerRuntimeConfigInput = {
   observerEnabled?: boolean;
   mirrorPublishIntervalSeconds?: number;
   observerSyncIntervalSeconds?: number;
-  observerBatchSize?: number;
   observerConfirmations?: number;
   mirrorPublishAccount?: string | null;
   mirrorOutputDir?: string | null;
@@ -81,7 +79,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       observer_enabled,
       mirror_publish_interval_seconds,
       observer_sync_interval_seconds,
-      observer_batch_size,
       observer_confirmations,
       mirror_publish_account,
       mirror_output_dir,
@@ -97,7 +94,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       ${input.observerEnabled ?? true},
       ${String(input.mirrorPublishIntervalSeconds ?? 86400)}::integer,
       ${String(input.observerSyncIntervalSeconds ?? 3600)}::integer,
-      ${String(input.observerBatchSize ?? 2000)}::integer,
       ${String(input.observerConfirmations ?? 12)}::integer,
       ${input.mirrorPublishAccount ?? null},
       ${input.mirrorOutputDir ?? null},
@@ -112,7 +108,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       observer_enabled = excluded.observer_enabled,
       mirror_publish_interval_seconds = excluded.mirror_publish_interval_seconds,
       observer_sync_interval_seconds = excluded.observer_sync_interval_seconds,
-      observer_batch_size = excluded.observer_batch_size,
       observer_confirmations = excluded.observer_confirmations,
       mirror_publish_account = excluded.mirror_publish_account,
       mirror_output_dir = excluded.mirror_output_dir,
@@ -197,7 +192,6 @@ export function isDue(lastRunAt: string | null, intervalSeconds: number, now = n
 function validateConfigInput(input: IndexerRuntimeConfigInput) {
   assertOptionalPositiveInteger(input.mirrorPublishIntervalSeconds, "mirrorPublishIntervalSeconds");
   assertOptionalPositiveInteger(input.observerSyncIntervalSeconds, "observerSyncIntervalSeconds");
-  assertOptionalPositiveInteger(input.observerBatchSize, "observerBatchSize");
   assertOptionalNonnegativeInteger(input.observerConfirmations, "observerConfirmations");
   assertOptionalPositiveInteger(input.blockRangeCap, "blockRangeCap");
   if (input.logRequestsPerSecond != null && (!Number.isFinite(input.logRequestsPerSecond) || input.logRequestsPerSecond <= 0)) {
