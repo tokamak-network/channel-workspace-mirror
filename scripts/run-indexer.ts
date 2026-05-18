@@ -95,13 +95,49 @@ async function main() {
 }
 
 async function configurePrivateStateCli(config: Awaited<ReturnType<typeof requireIndexerRuntimeConfig>>) {
-  run("private-state-cli", ["install", "--read-only"]);
+  ensureReadOnlyInstall();
   const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
   const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
   const rpcArgs = ["set", "rpc", "--network", "mainnet", "--rpc-url", config.rpc_url];
   rpcArgs.push("--log-requests-per-second", String(logRequestsPerSecond));
   rpcArgs.push("--block-range-cap", String(blockRangeCap));
   run("private-state-cli", rpcArgs);
+}
+
+function ensureReadOnlyInstall() {
+  if (hasReadOnlyInstall()) {
+    return;
+  }
+  run("private-state-cli", ["install", "--read-only"]);
+}
+
+function hasReadOnlyInstall() {
+  const root = path.join(os.homedir(), "tokamak-private-channels", "dapps", "private-state");
+  const manifestPath = path.join(root, "install-manifest.json");
+  if (!fs.existsSync(manifestPath)) {
+    return false;
+  }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      install?: {
+        mode?: string;
+        installedDeploymentArtifacts?: { chainId?: number }[];
+      };
+    };
+    const hasMainnetArtifacts = manifest.install?.installedDeploymentArtifacts
+      ?.some((artifact) => Number(artifact.chainId) === 1) === true;
+    const requiredFiles = [
+      "bridge.1.json",
+      "bridge-abi-manifest.1.json",
+      "deployment.1.latest.json",
+      "storage-layout.1.latest.json",
+    ];
+    return manifest.install?.mode === "read-only"
+      && hasMainnetArtifacts
+      && requiredFiles.every((file) => fs.existsSync(path.join(root, "chain-id-1", file)));
+  } catch {
+    return false;
+  }
 }
 
 function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
