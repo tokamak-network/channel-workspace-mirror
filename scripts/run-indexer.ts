@@ -33,40 +33,31 @@ async function main() {
   const config = await requireIndexerRuntimeConfig(channel.slug);
   const state = await getIndexerRunState(channel.slug);
   const now = new Date();
-  const observerDue = isDue(state?.last_observer_run_at ?? null, config.observer_sync_interval_seconds, now);
   const mirrorDue = isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
-
-  if (!observerDue && !mirrorDue) {
-    console.log(JSON.stringify({ ok: true, skipped: true, reason: "not_due" }, null, 2));
-    return;
-  }
 
   try {
     await configurePrivateStateCli(config);
     const localWorkspaceRecovered = hasLocalRecoveredWorkspace(channel.name);
-    const recovery = observerDue || mirrorDue ? recoverWorkspace(channel.name, !localWorkspaceRecovered) : null;
+    const recovery = recoverWorkspace(channel.name, !localWorkspaceRecovered);
     const rawHistoryDir = recovery?.result.rpcCallHistory?.historyDir ?? null;
 
-    let observer = null;
-    if (observerDue) {
-      if (recovery?.fromGenesis) {
-        await resetObserverAccumulatedScan(channel);
-      }
-      const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
-      const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
-      await updateIndexerRunState(channel.slug, { observerRunAt: now, rawHistoryDir });
-      observer = await syncObserverChannel(channel, {
-        rpcUrl: config.rpc_url,
-        rawHistoryDir,
-        blockRangeCap,
-        logRequestsPerSecond,
-      });
-      await updateIndexerRunState(channel.slug, {
-        observerSuccessAt: new Date(),
-        rawHistoryDir,
-        error: null,
-      });
+    if (recovery?.fromGenesis) {
+      await resetObserverAccumulatedScan(channel);
     }
+    const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
+    const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
+    await updateIndexerRunState(channel.slug, { observerRunAt: now, rawHistoryDir });
+    const observer = await syncObserverChannel(channel, {
+      rpcUrl: config.rpc_url,
+      rawHistoryDir,
+      blockRangeCap,
+      logRequestsPerSecond,
+    });
+    await updateIndexerRunState(channel.slug, {
+      observerSuccessAt: new Date(),
+      rawHistoryDir,
+      error: null,
+    });
 
     let mirror = null;
     if (mirrorDue) {

@@ -23,15 +23,12 @@ create table if not exists indexer_runtime_config (
   log_requests_per_second numeric,
   block_range_cap integer,
   mirror_publish_interval_seconds integer not null default 86400,
-  observer_sync_interval_seconds integer not null default 3600,
   observer_batch_size integer not null default 2000,
   mirror_publish_account text,
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   constraint indexer_runtime_config_mirror_interval_positive
     check (mirror_publish_interval_seconds > 0),
-  constraint indexer_runtime_config_observer_interval_positive
-    check (observer_sync_interval_seconds > 0),
   constraint indexer_runtime_config_batch_size_positive
     check (observer_batch_size > 0)
 );

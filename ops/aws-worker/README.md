@@ -52,9 +52,8 @@ The bootstrap script installs:
 - `channel-workspace-mirror-indexer.service`
 - `channel-workspace-mirror-indexer.timer`
 
-The timer wakes every five minutes by default. The worker itself checks the DB runtime intervals
-before doing heavy work, so this short timer interval does not force mirror publishing or observer
-sync when they are not due.
+The timer wakes every five minutes by default. Each wake attempts CLI recovery and observer sync.
+Mirror publishing still checks the DB mirror publish interval before uploading a new mirror archive.
 
 Useful commands:
 

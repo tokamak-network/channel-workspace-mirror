@@ -36,8 +36,7 @@ ADMIN_TOKEN=...
 ```
 
 `ADMIN_TOKEN` protects all operator-only endpoints for both mirror and observer operations. Runtime
-indexer settings such as RPC URL and sync intervals are stored in Neon, not in RPC environment
-variables.
+indexer settings such as the RPC URL are stored in Neon, not in RPC environment variables.
 
 ## Setup
 
@@ -166,8 +165,9 @@ The worker uses the same Neon database and Vercel Blob token as the Vercel deplo
 configuration is still managed through `/api/admin/indexer-config`; the EC2 host only needs
 `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, and `ADMIN_TOKEN` in `/etc/channel-workspace-mirror.env`.
 
-The systemd timer runs frequently, but `npm run indexer:run` checks the DB runtime intervals before
-performing any heavy recovery, observer sync, or mirror publish work.
+The systemd timer controls observer sync frequency. Each worker wake attempts CLI recovery and
+observer sync. Mirror publishing still checks the DB mirror publish interval before uploading a new
+mirror archive.
 
 ## Health
 
@@ -191,7 +191,6 @@ curl -X PUT "$BASE_URL/api/admin/indexer-config" \
   -H "Content-Type: application/json" \
   --data '{
     "rpcUrl": "https://...",
-    "observerSyncIntervalSeconds": 3600,
     "mirrorPublishIntervalSeconds": 86400,
     "mirrorPublishAccount": "the-great-first-channel"
   }'

@@ -6,7 +6,6 @@ export type IndexerRuntimeConfig = {
   log_requests_per_second: string | null;
   block_range_cap: number | null;
   mirror_publish_interval_seconds: number;
-  observer_sync_interval_seconds: number;
   mirror_publish_account: string | null;
   updated_at: string;
   created_at: string;
@@ -29,7 +28,6 @@ export type IndexerRuntimeConfigInput = {
   logRequestsPerSecond?: number | null;
   blockRangeCap?: number | null;
   mirrorPublishIntervalSeconds?: number;
-  observerSyncIntervalSeconds?: number;
   mirrorPublishAccount?: string | null;
 };
 
@@ -65,7 +63,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       log_requests_per_second,
       block_range_cap,
       mirror_publish_interval_seconds,
-      observer_sync_interval_seconds,
       mirror_publish_account,
       updated_at
     )
@@ -75,7 +72,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       ${input.logRequestsPerSecond == null ? null : String(input.logRequestsPerSecond)}::numeric,
       ${input.blockRangeCap == null ? null : String(input.blockRangeCap)}::integer,
       ${String(input.mirrorPublishIntervalSeconds ?? 86400)}::integer,
-      ${String(input.observerSyncIntervalSeconds ?? 3600)}::integer,
       ${input.mirrorPublishAccount ?? null},
       now()
     )
@@ -84,7 +80,6 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       log_requests_per_second = excluded.log_requests_per_second,
       block_range_cap = excluded.block_range_cap,
       mirror_publish_interval_seconds = excluded.mirror_publish_interval_seconds,
-      observer_sync_interval_seconds = excluded.observer_sync_interval_seconds,
       mirror_publish_account = excluded.mirror_publish_account,
       updated_at = now()
     returning *
@@ -166,7 +161,6 @@ export function isDue(lastRunAt: string | null, intervalSeconds: number, now = n
 
 function validateConfigInput(input: IndexerRuntimeConfigInput) {
   assertOptionalPositiveInteger(input.mirrorPublishIntervalSeconds, "mirrorPublishIntervalSeconds");
-  assertOptionalPositiveInteger(input.observerSyncIntervalSeconds, "observerSyncIntervalSeconds");
   assertOptionalPositiveInteger(input.blockRangeCap, "blockRangeCap");
   if (input.logRequestsPerSecond != null && (!Number.isFinite(input.logRequestsPerSecond) || input.logRequestsPerSecond <= 0)) {
     throw new Error("logRequestsPerSecond must be a positive number.");
