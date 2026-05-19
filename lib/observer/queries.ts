@@ -48,24 +48,27 @@ export type ObserverDashboard = {
     updatedAt: string | null;
   };
   stats: {
+    channelCreated: ObserverEventRow | null;
     latestAcceptedTransition: ObserverEventRow | null;
     totalL1BridgeDeposits: string;
     totalL1BridgeWithdrawals: string;
     channelParticipantsCount: string;
+    joinedParticipantsCount: string;
+    exitedParticipantsCount: string;
     eventCounts: Record<string, string>;
   };
   lists: {
     bridgeEvents: ObserverEventRow[];
-    channelJoins: ObserverEventRow[];
-    registeredAddressPairs: ObserverEventRow[];
-    noteReceivePublicKeys: ObserverEventRow[];
+    participantEvents: ObserverEventRow[];
     commitmentEvents: ObserverEventRow[];
     nullifierEvents: ObserverEventRow[];
     encryptedPayloadEvents: ObserverEventRow[];
+    privateStateEvents: ObserverEventRow[];
     policyEvents: ObserverEventRow[];
     transitionEvents: ObserverEventRow[];
     verifierEvents: ObserverEventRow[];
     adminEvents: ObserverEventRow[];
+    upgradeEvents: ObserverEventRow[];
     recentEvents: ObserverEventRow[];
   };
 };
@@ -83,7 +86,7 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
     return null;
   }
 
-  const [syncRows, latestTransitions, totals, participantRows, countRows] = await Promise.all([
+  const [syncRows, channelCreatedRows, latestTransitions, totals, participantRows, countRows] = await Promise.all([
     sql`
       select last_scanned_block, latest_block, updated_at
       from observer_sync_state
@@ -91,6 +94,7 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
         and channel_id = ${channel.channel_id}
       limit 1
     ` as unknown as Promise<{ last_scanned_block: string; latest_block: string | null; updated_at: string }[]>,
+    eventRows(channel, { eventName: "ChannelCreated", limit: 1, sort: "asc" }),
     eventRows(channel, { eventName: "CurrentRootVectorObserved", limit: 1 }),
     sql`
       select
@@ -115,11 +119,16 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
           and channel_id = ${channel.channel_id}
           and event_name = 'ChannelTokenVaultIdentityExited'
       )
-      select count(*)::text as active_count
-      from registered
-      where l1_address is not null
-        and l1_address not in (select l1_address from exited where l1_address is not null)
-    ` as unknown as Promise<{ active_count: string }[]>,
+      select
+        (select count(*) from registered where l1_address is not null)::text as joined_count,
+        (select count(*) from exited where l1_address is not null)::text as exited_count,
+        (
+          select count(*)
+          from registered
+          where l1_address is not null
+            and l1_address not in (select l1_address from exited where l1_address is not null)
+        )::text as active_count
+    ` as unknown as Promise<{ active_count: string; joined_count: string; exited_count: string }[]>,
     sql`
       select event_group, count(*)::text as count
       from observer_events
@@ -132,24 +141,28 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
 
   const [
     bridgeEvents,
-    channelJoins,
+    participantEvents,
     storageEvents,
     encryptedPayloadEvents,
+    privateStateEvents,
     policyEvents,
     transitionEvents,
     verifierEvents,
     adminEvents,
+    upgradeEvents,
     recentEvents,
   ] = await Promise.all([
     eventRowsByGroups(channel, ["deposit", "withdrawal"], 100),
-    eventRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", limit: 100 }),
+    eventRowsByGroups(channel, ["participant"], 100),
     eventRows(channel, { eventName: "StorageKeyObserved", limit: 100 }),
     eventRows(channel, { eventName: "NoteValueEncrypted", limit: 100 }),
+    eventRowsByGroups(channel, ["transition", "commitment_or_nullifier", "encrypted_payload", "l2_accounting"], 100),
     eventRows(channel, { eventGroup: "policy", limit: 100 }),
     eventRows(channel, { eventGroup: "transition", limit: 100 }),
     eventRows(channel, { eventGroup: "verifier", limit: 100 }),
     eventRows(channel, { eventGroup: "admin", limit: 100 }),
-    eventRows(channel, { limit: 100 }),
+    eventRows(channel, { eventGroup: "upgrade", limit: 100 }),
+    eventRows(channel, { excludedGroups: ["policy", "verifier", "admin", "upgrade"], limit: 100 }),
   ]);
 
   const eventCounts: Record<string, string> = {};
@@ -165,24 +178,27 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
       updatedAt: syncRows[0]?.updated_at ?? null,
     },
     stats: {
+      channelCreated: channelCreatedRows[0] ?? null,
       latestAcceptedTransition: latestTransitions[0] ?? null,
       totalL1BridgeDeposits: totals[0]?.deposits ?? "0",
       totalL1BridgeWithdrawals: totals[0]?.withdrawals ?? "0",
       channelParticipantsCount: participantRows[0]?.active_count ?? "0",
+      joinedParticipantsCount: participantRows[0]?.joined_count ?? "0",
+      exitedParticipantsCount: participantRows[0]?.exited_count ?? "0",
       eventCounts,
     },
     lists: {
       bridgeEvents,
-      channelJoins,
-      registeredAddressPairs: channelJoins,
-      noteReceivePublicKeys: channelJoins,
+      participantEvents,
       commitmentEvents: storageEvents,
       nullifierEvents: storageEvents,
       encryptedPayloadEvents,
+      privateStateEvents,
       policyEvents,
       transitionEvents,
       verifierEvents,
       adminEvents,
+      upgradeEvents,
       recentEvents,
     },
   };
@@ -202,10 +218,11 @@ export async function getObserverEvents(slug: string, filters: { group?: string;
 
 async function eventRows(
   channel: ObserverChannelRow,
-  filters: { eventGroup?: string; eventName?: string; limit?: number },
+  filters: { eventGroup?: string; eventName?: string; excludedGroups?: string[]; limit?: number; sort?: "asc" | "desc" },
 ) {
   const sql = getSql();
   const limit = Math.min(Math.max(filters.limit ?? 100, 1), 500);
+  const excludedGroups = filters.excludedGroups ?? [];
   const rows = await sql`
     select
       id::text,
@@ -222,7 +239,12 @@ async function eventRows(
       and channel_id = ${channel.channel_id}
       and (${filters.eventGroup ?? null}::text is null or event_group = ${filters.eventGroup ?? null})
       and (${filters.eventName ?? null}::text is null or event_name = ${filters.eventName ?? null})
-    order by block_number desc, log_index desc
+      and (cardinality(${excludedGroups}::text[]) = 0 or event_group <> all(${excludedGroups}::text[]))
+    order by
+      case when ${filters.sort ?? "desc"} = 'asc' then block_number end asc,
+      case when ${filters.sort ?? "desc"} = 'asc' then log_index end asc,
+      case when ${filters.sort ?? "desc"} = 'desc' then block_number end desc,
+      case when ${filters.sort ?? "desc"} = 'desc' then log_index end desc
     limit ${String(limit)}::integer
   ` as ObserverEventRow[];
   return rows;

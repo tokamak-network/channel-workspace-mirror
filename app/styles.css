@@ -233,6 +233,27 @@ dd {
   gap: 18px;
 }
 
+.detail-section {
+  max-width: none;
+  display: grid;
+  gap: 12px;
+}
+
+.detail-section + .detail-section {
+  border-top: 1px solid #e3e7ee;
+  padding-top: 16px;
+}
+
+.detail-section h3 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.section-note {
+  color: #3f4754;
+  font-size: 14px;
+}
+
 .breadcrumb {
   display: flex;
   gap: 10px;
