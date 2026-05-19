@@ -205,9 +205,7 @@ dd {
 }
 
 .section-heading {
-  display: grid;
-  grid-template-columns: 148px minmax(0, 1fr);
-  gap: 22px;
+  display: block;
   margin-bottom: 18px;
 }
 

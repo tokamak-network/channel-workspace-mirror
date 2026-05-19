@@ -62,7 +62,10 @@ export type ObserverDashboard = {
     commitmentEvents: ObserverEventRow[];
     nullifierEvents: ObserverEventRow[];
     encryptedPayloadEvents: ObserverEventRow[];
-    upgradeHistory: ObserverEventRow[];
+    policyEvents: ObserverEventRow[];
+    transitionEvents: ObserverEventRow[];
+    verifierEvents: ObserverEventRow[];
+    adminEvents: ObserverEventRow[];
     recentEvents: ObserverEventRow[];
   };
 };
@@ -132,14 +135,20 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
     channelJoins,
     storageEvents,
     encryptedPayloadEvents,
-    upgradeHistory,
+    policyEvents,
+    transitionEvents,
+    verifierEvents,
+    adminEvents,
     recentEvents,
   ] = await Promise.all([
     eventRowsByGroups(channel, ["deposit", "withdrawal"], 100),
     eventRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", limit: 100 }),
     eventRows(channel, { eventName: "StorageKeyObserved", limit: 100 }),
     eventRows(channel, { eventName: "NoteValueEncrypted", limit: 100 }),
-    eventRows(channel, { eventGroup: "upgrade", limit: 100 }),
+    eventRows(channel, { eventGroup: "policy", limit: 100 }),
+    eventRows(channel, { eventGroup: "transition", limit: 100 }),
+    eventRows(channel, { eventGroup: "verifier", limit: 100 }),
+    eventRows(channel, { eventGroup: "admin", limit: 100 }),
     eventRows(channel, { limit: 100 }),
   ]);
 
@@ -170,7 +179,10 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
       commitmentEvents: storageEvents,
       nullifierEvents: storageEvents,
       encryptedPayloadEvents,
-      upgradeHistory,
+      policyEvents,
+      transitionEvents,
+      verifierEvents,
+      adminEvents,
       recentEvents,
     },
   };

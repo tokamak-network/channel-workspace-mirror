@@ -6,7 +6,6 @@ type SectionId = "funds" | "participants" | "privacy" | "rules" | "verification"
 
 type ObserverSectionDefinition = {
   id: SectionId;
-  label: string;
   title: string;
   summary: string;
 };
@@ -14,44 +13,37 @@ type ObserverSectionDefinition = {
 export const observerSections: ObserverSectionDefinition[] = [
   {
     id: "funds",
-    label: "Funds",
     title: "Bridge Funds",
     summary: "Deposits, withdrawals, canonical asset, and vault addresses.",
   },
   {
     id: "participants",
-    label: "Participants",
-    title: "Participant Registry",
+    title: "Participants",
     summary: "Active members and public identity registration records.",
   },
   {
     id: "privacy",
-    label: "Privacy",
     title: "Privacy Signals",
     summary: "Commitments, nullifiers, and encrypted note payloads.",
   },
   {
     id: "rules",
-    label: "Rules",
     title: "Channel Rules",
-    summary: "Managers, controllers, accounting vaults, and metadata roots.",
+    summary: "Managers, controllers, accounting vaults, metadata roots, and policy changes.",
   },
   {
     id: "verification",
-    label: "Verification",
     title: "Proof Verification",
-    summary: "Verifier contracts, versions, and upgrade history.",
+    summary: "Verifier contracts, verifier versions, accepted transitions, and verifier update records.",
   },
   {
     id: "notices",
-    label: "Notices",
-    title: "Governance Notices",
-    summary: "Admin wallet, incident status, source references, and ABI links.",
+    title: "Governance",
+    summary: "Admin wallet, incident status, ownership records, source references, and ABI links.",
   },
   {
     id: "audit",
-    label: "Audit",
-    title: "Public Event Log",
+    title: "Event Log",
     summary: "Indexed event counts and recent public records.",
   },
 ];
@@ -102,11 +94,11 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
           <InfoItem label="Active" value={stats.channelParticipantsCount} />
           <InfoItem label="Recent registrations" value={String(lists.channelJoins.length)} />
         </OverviewBlock>
-        <OverviewBlock title="Verification" href={`/observer/${channel.slug}/verification`}>
+        <OverviewBlock title="Proof Verification" href={`/observer/${channel.slug}/verification`}>
           <InfoItem label="Tokamak verifier" value={channel.tokamak_verifier ?? "unknown"} mono />
           <InfoItem label="Groth16 verifier" value={channel.groth_verifier ?? "unknown"} mono />
         </OverviewBlock>
-        <OverviewBlock title="Notices" href={`/observer/${channel.slug}/notices`}>
+        <OverviewBlock title="Governance" href={`/observer/${channel.slug}/notices`}>
           <InfoItem label="Incident status" value={channel.incident_notice ?? "No active incident notices"} />
           <InfoItem label="Admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
         </OverviewBlock>
@@ -129,13 +121,13 @@ export function ObserverSectionPage({
 
   return (
     <main className="observer-shell">
-      <ObserverHeader dashboard={dashboard} activeSection={sectionId} />
+      <ObserverHeader dashboard={dashboard} />
       <ObserverNav channelSlug={dashboard.channel.slug} activeSection={sectionId} />
       <nav className="breadcrumb" aria-label="Observer navigation">
         <Link href={`/observer/${dashboard.channel.slug}`}>Overview</Link>
         <span>{section.title}</span>
       </nav>
-      <ObserverSection eyebrow={section.label} title={section.title} summary={section.summary}>
+      <ObserverSection title={section.title} summary={section.summary}>
         <SectionDetail dashboard={dashboard} sectionId={sectionId} />
       </ObserverSection>
     </main>
@@ -146,7 +138,6 @@ function ObserverHeader({
   dashboard,
 }: {
   dashboard: ObserverDashboard;
-  activeSection?: SectionId;
 }) {
   const { channel, sync } = dashboard;
   return (
@@ -183,7 +174,7 @@ function ObserverNav({
           href={`/observer/${channelSlug}/${section.id}`}
           key={section.id}
         >
-          {section.label}
+          {section.title}
         </Link>
       ))}
     </nav>
@@ -243,14 +234,17 @@ function SectionDetail({
 
   if (sectionId === "rules") {
     return (
-      <InfoGrid>
-        <InfoItem label="ChannelManager" value={channel.channel_manager} mono />
-        <InfoItem label="Controller" value={channel.controller ?? "unknown"} mono />
-        <InfoItem label="L2AccountingVault" value={channel.l2_accounting_vault ?? "unknown"} mono />
-        <InfoItem label="Function root" value={channel.function_root ?? "unknown"} mono />
-        <InfoItem label="DApp metadata schema" value={channel.dapp_metadata_digest_schema ?? "unknown"} />
-        <InfoItem label="DApp metadata digest" value={channel.dapp_metadata_digest ?? "unknown"} mono />
-      </InfoGrid>
+      <>
+        <InfoGrid>
+          <InfoItem label="ChannelManager" value={channel.channel_manager} mono />
+          <InfoItem label="Controller" value={channel.controller ?? "unknown"} mono />
+          <InfoItem label="L2AccountingVault" value={channel.l2_accounting_vault ?? "unknown"} mono />
+          <InfoItem label="Function root" value={channel.function_root ?? "unknown"} mono />
+          <InfoItem label="DApp metadata schema" value={channel.dapp_metadata_digest_schema ?? "unknown"} />
+          <InfoItem label="DApp metadata digest" value={channel.dapp_metadata_digest ?? "unknown"} mono />
+        </InfoGrid>
+        <EventTable title="Policy changes" events={lists.policyEvents} displayLimit={50} />
+      </>
     );
   }
 
@@ -261,20 +255,25 @@ function SectionDetail({
           <InfoItem label="Verifier version" value={verifierVersion} />
           <InfoItem label="Tokamak verifier" value={channel.tokamak_verifier ?? "unknown"} mono />
           <InfoItem label="Groth16 verifier" value={channel.groth_verifier ?? "unknown"} mono />
+          <InfoItem label="Latest accepted transition" value={stats.latestAcceptedTransition?.block_number ?? "none"} />
         </InfoGrid>
-        <EventTable title="Upgrade history" events={lists.upgradeHistory} displayLimit={50} />
+        <EventTable title="Accepted transitions" events={lists.transitionEvents} displayLimit={50} />
+        <EventTable title="Verifier updates" events={lists.verifierEvents} displayLimit={50} />
       </>
     );
   }
 
   if (sectionId === "notices") {
     return (
-      <InfoGrid>
-        <InfoItem label="Admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
-        <InfoItem label="Incident notices" value={channel.incident_notice ?? "No active incident notices"} />
-        <InfoItem label="Source code" value={<ExternalValue value={channel.source_code_url} />} />
-        <InfoItem label="ABI" value={<ExternalValue value={channel.abi_url} />} />
-      </InfoGrid>
+      <>
+        <InfoGrid>
+          <InfoItem label="Admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
+          <InfoItem label="Incident notices" value={channel.incident_notice ?? "No active incident notices"} />
+          <InfoItem label="Source code" value={<ExternalValue value={channel.source_code_url} />} />
+          <InfoItem label="ABI" value={<ExternalValue value={channel.abi_url} />} />
+        </InfoGrid>
+        <EventTable title="Ownership records" events={lists.adminEvents} displayLimit={50} />
+      </>
     );
   }
 
@@ -291,12 +290,10 @@ function SectionDetail({
 }
 
 function ObserverSection({
-  eyebrow,
   title,
   summary,
   children,
 }: {
-  eyebrow: string;
   title: string;
   summary: string;
   children: ReactNode;
@@ -304,7 +301,6 @@ function ObserverSection({
   return (
     <section className="observer-section">
       <div className="section-heading">
-        <p className="section-eyebrow">{eyebrow}</p>
         <div>
           <h2>{title}</h2>
           <p>{summary}</p>
