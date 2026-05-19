@@ -76,6 +76,7 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
   return (
     <main className="observer-shell">
       <ObserverHeader dashboard={dashboard} />
+      <ObserverNav channelSlug={dashboard.channel.slug} />
 
       <section className="overview-panel" aria-label="Channel overview">
         <div className="overview-primary">
@@ -148,6 +149,7 @@ export function ObserverSectionPage({
   return (
     <main className="observer-shell">
       <ObserverHeader dashboard={dashboard} activeSection={sectionId} />
+      <ObserverNav channelSlug={dashboard.channel.slug} activeSection={sectionId} />
       <nav className="breadcrumb" aria-label="Observer navigation">
         <Link href={`/observer/${dashboard.channel.slug}`}>Overview</Link>
         <span>{section.title}</span>
@@ -161,7 +163,6 @@ export function ObserverSectionPage({
 
 function ObserverHeader({
   dashboard,
-  activeSection,
 }: {
   dashboard: ObserverDashboard;
   activeSection?: SectionId;
@@ -174,28 +175,37 @@ function ObserverHeader({
         <h1>{channel.name}</h1>
         <p className="lede">Public evidence for channel users, operators, and oversight reviewers.</p>
       </div>
-      <div>
-        <dl className="status-strip" aria-label="Sync status">
-          <InfoItem label="Scanned" value={sync.lastScannedBlock ?? "not synced"} />
-          <InfoItem label="Latest L1" value={sync.latestBlock ?? "not synced"} />
-          <InfoItem label="Updated" value={formatDate(sync.updatedAt)} />
-        </dl>
-        <nav className="section-tabs" aria-label="Observer sections">
-          <Link className={!activeSection ? "active" : undefined} href={`/observer/${channel.slug}`}>
-            Overview
-          </Link>
-          {observerSections.map((section) => (
-            <Link
-              className={activeSection === section.id ? "active" : undefined}
-              href={`/observer/${channel.slug}/${section.id}`}
-              key={section.id}
-            >
-              {section.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <dl className="status-strip" aria-label="Sync status">
+        <InfoItem label="Scanned" value={sync.lastScannedBlock ?? "not synced"} />
+        <InfoItem label="Latest L1" value={sync.latestBlock ?? "not synced"} />
+        <InfoItem label="Updated" value={formatDate(sync.updatedAt)} />
+      </dl>
     </header>
+  );
+}
+
+function ObserverNav({
+  channelSlug,
+  activeSection,
+}: {
+  channelSlug: string;
+  activeSection?: SectionId;
+}) {
+  return (
+    <nav className="observer-nav" aria-label="Observer sections">
+      <Link className={!activeSection ? "active" : undefined} href={`/observer/${channelSlug}`}>
+        Overview
+      </Link>
+      {observerSections.map((section) => (
+        <Link
+          className={activeSection === section.id ? "active" : undefined}
+          href={`/observer/${channelSlug}/${section.id}`}
+          key={section.id}
+        >
+          {section.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 

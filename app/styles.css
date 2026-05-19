@@ -58,7 +58,7 @@ code {
   grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
   gap: 32px;
   align-items: start;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .eyebrow {
@@ -243,7 +243,7 @@ dd {
 
 .overview-block-heading a,
 .breadcrumb a,
-.section-tabs a {
+.observer-nav a {
   font-weight: 700;
 }
 
@@ -299,29 +299,33 @@ dd {
   color: #9aa3b1;
 }
 
-.section-tabs {
+.observer-nav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 24px;
+  max-width: none;
+  margin: 0 0 20px;
+  border-bottom: 1px solid #d9dde5;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  white-space: nowrap;
 }
 
-.section-tabs a {
+.observer-nav a {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid #d9dde5;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #364052;
-  font-size: 12px;
+  min-height: 42px;
+  border-bottom: 3px solid transparent;
+  color: #4c5563;
+  font-size: 14px;
   text-decoration: none;
 }
 
-.section-tabs a.active {
-  border-color: #1f6f5c;
-  background: #eaf5f1;
+.observer-nav a:hover {
+  color: #16181d;
+}
+
+.observer-nav a.active {
+  border-bottom-color: #1f6f5c;
   color: #174f42;
 }
 
