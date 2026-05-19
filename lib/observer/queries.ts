@@ -25,6 +25,15 @@ export type ObserverChannelRow = {
   abi_url: string | null;
   admin_wallet: string | null;
   incident_notice: string | null;
+  dapp_manager: string | null;
+  channel_deployer: string | null;
+  bridge_core_implementation: string | null;
+  bridge_core_proxy_admin: string | null;
+  bridge_token_vault_implementation: string | null;
+  bridge_token_vault_proxy_admin: string | null;
+  current_join_toll: string | null;
+  current_root_vector_hash: string | null;
+  current_state_refreshed_at: string | null;
   updated_at: string;
 };
 

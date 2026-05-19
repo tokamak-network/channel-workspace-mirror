@@ -4,6 +4,7 @@ import {
   createPublicClient,
   decodeEventLog,
   http,
+  parseAbi,
   type AbiEvent,
   type Address,
   type Log,
@@ -52,6 +53,8 @@ type RawHistoryEntry = {
 };
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ERC1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+const ERC1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 const RAW_RECOVERY_EVENTS = new Set([
   "CurrentRootVectorObserved",
   "StorageKeyObserved",
@@ -78,6 +81,29 @@ const TARGETED_EVENTS = [
   { addressKey: "bridgeTokenVault", eventName: "OwnershipTransferred" },
 ] as const;
 
+const currentStateAbi = parseAbi([
+  "function canonicalAsset() view returns (address)",
+  "function bridgeTokenVault() view returns (address)",
+  "function dAppManager() view returns (address)",
+  "function channelDeployer() view returns (address)",
+  "function getChannelManager(uint256 channelId) view returns (address)",
+  "function grothVerifier() view returns (address)",
+  "function tokamakVerifier() view returns (address)",
+  "function owner() view returns (address)",
+  "function channelId() view returns (uint256)",
+  "function dappId() view returns (uint256)",
+  "function leader() view returns (address)",
+  "function dappMetadataDigestSchema() view returns (bytes32)",
+  "function dappMetadataDigest() view returns (bytes32)",
+  "function functionRoot() view returns (bytes32)",
+  "function currentRootVectorHash() view returns (bytes32)",
+  "function joinToll() view returns (uint256)",
+  "function grothVerifierCompatibleBackendVersion() view returns (string)",
+  "function tokamakVerifierCompatibleBackendVersion() view returns (string)",
+  "function getDAppInfo(uint256 dappId) view returns ((bool exists,bytes32 labelHash,uint256 channelTokenVaultTreeIndex,bytes32 metadataDigestSchema,bytes32 metadataDigest,bytes32 functionRoot))",
+  "function getDAppVerifierSnapshot(uint256 dappId) view returns ((address grothVerifier,string grothVerifierCompatibleBackendVersion,address tokamakVerifier,string tokamakVerifierCompatibleBackendVersion))",
+]);
+
 export async function syncDefaultObserverChannel(rawHistoryDir?: string | null): Promise<SyncResult> {
   const runtime = await requireIndexerRuntimeConfig(DEFAULT_OBSERVER_CHANNEL.slug);
   const logRequestsPerSecond = requiredPositiveNumber(runtime.log_requests_per_second, "log_requests_per_second");
@@ -102,6 +128,7 @@ export async function syncObserverChannel(
   });
   const limiter = createRpcRateLimiter(options.logRequestsPerSecond);
   const latestBlock = await limitedRpc(limiter, () => client.getBlockNumber());
+  await refreshChannelCurrentState(channel, client, limiter);
 
   const rawImported = options.rawHistoryDir
     ? await importRawRpcCallHistory({ channel, client, limiter, historyDir: options.rawHistoryDir })
@@ -203,6 +230,247 @@ async function upsertChannel(channel: ObserverChannelConfig) {
       admin_wallet = excluded.admin_wallet,
       updated_at = now()
   `;
+}
+
+async function refreshChannelCurrentState(
+  channel: ObserverChannelConfig,
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+) {
+  const bridgeCore = channel.bridgeCore;
+  const configuredChannelId = BigInt(channel.channelId);
+  const dappId = BigInt(channel.dappId);
+
+  const [
+    canonicalAsset,
+    bridgeTokenVaultFromCore,
+    dAppManager,
+    channelDeployer,
+    currentChannelManager,
+    bridgeOwner,
+    bridgeCoreImplementation,
+    bridgeCoreProxyAdmin,
+    bridgeTokenVaultImplementation,
+    bridgeTokenVaultProxyAdmin,
+  ] = await Promise.all([
+    readAddress(client, limiter, bridgeCore, "canonicalAsset"),
+    readAddress(client, limiter, bridgeCore, "bridgeTokenVault"),
+    readAddress(client, limiter, bridgeCore, "dAppManager"),
+    readAddress(client, limiter, bridgeCore, "channelDeployer"),
+    readAddress(client, limiter, bridgeCore, "getChannelManager", [configuredChannelId]),
+    readAddress(client, limiter, bridgeCore, "owner"),
+    readProxySlotAddress(client, limiter, bridgeCore, ERC1967_IMPLEMENTATION_SLOT),
+    readProxySlotAddress(client, limiter, bridgeCore, ERC1967_ADMIN_SLOT),
+    readProxySlotAddress(client, limiter, channel.bridgeTokenVault, ERC1967_IMPLEMENTATION_SLOT),
+    readProxySlotAddress(client, limiter, channel.bridgeTokenVault, ERC1967_ADMIN_SLOT),
+  ]);
+
+  const [
+    channelDAppId,
+    channelLeader,
+    channelBridgeTokenVault,
+    channelMetadataDigestSchema,
+    channelMetadataDigest,
+    channelFunctionRoot,
+    currentRootVectorHash,
+    currentJoinToll,
+    dAppInfo,
+    dAppVerifierSnapshot,
+  ] = await Promise.all([
+    readBigInt(client, limiter, currentChannelManager, "dappId"),
+    readAddress(client, limiter, currentChannelManager, "leader"),
+    readAddress(client, limiter, currentChannelManager, "bridgeTokenVault"),
+    readHexString(client, limiter, currentChannelManager, "dappMetadataDigestSchema"),
+    readHexString(client, limiter, currentChannelManager, "dappMetadataDigest"),
+    readHexString(client, limiter, currentChannelManager, "functionRoot"),
+    readHexString(client, limiter, currentChannelManager, "currentRootVectorHash"),
+    readBigInt(client, limiter, currentChannelManager, "joinToll"),
+    readDAppInfo(client, limiter, dAppManager, dappId),
+    readDAppVerifierSnapshot(client, limiter, dAppManager, dappId),
+  ]);
+
+  if (channelDAppId !== dappId) {
+    throw new Error(`RPC channel dappId mismatch: expected ${dappId.toString()}, got ${channelDAppId.toString()}.`);
+  }
+  if (lowerAddress(channelBridgeTokenVault) !== lowerAddress(bridgeTokenVaultFromCore)) {
+    throw new Error(`RPC bridgeTokenVault mismatch between BridgeCore and ChannelManager.`);
+  }
+  if (
+    channelMetadataDigestSchema !== dAppInfo.metadataDigestSchema
+    || channelMetadataDigest !== dAppInfo.metadataDigest
+    || channelFunctionRoot !== dAppInfo.functionRoot
+  ) {
+    throw new Error("RPC DApp metadata mismatch between DAppManager and ChannelManager.");
+  }
+
+  const sql = getSql();
+  await sql`
+    update observer_channels
+    set
+      canonical_asset = ${canonicalAsset},
+      channel_manager = ${currentChannelManager},
+      bridge_token_vault = ${bridgeTokenVaultFromCore},
+      dapp_manager = ${dAppManager},
+      channel_deployer = ${channelDeployer},
+      leader = ${channelLeader},
+      dapp_metadata_digest_schema = ${dAppInfo.metadataDigestSchema},
+      dapp_metadata_digest = ${dAppInfo.metadataDigest},
+      function_root = ${dAppInfo.functionRoot},
+      groth_verifier = ${dAppVerifierSnapshot.grothVerifier},
+      groth_verifier_version = ${dAppVerifierSnapshot.grothVerifierCompatibleBackendVersion},
+      tokamak_verifier = ${dAppVerifierSnapshot.tokamakVerifier},
+      tokamak_verifier_version = ${dAppVerifierSnapshot.tokamakVerifierCompatibleBackendVersion},
+      admin_wallet = ${bridgeOwner},
+      bridge_core_implementation = ${bridgeCoreImplementation},
+      bridge_core_proxy_admin = ${bridgeCoreProxyAdmin},
+      bridge_token_vault_implementation = ${bridgeTokenVaultImplementation},
+      bridge_token_vault_proxy_admin = ${bridgeTokenVaultProxyAdmin},
+      current_join_toll = ${currentJoinToll.toString()},
+      current_root_vector_hash = ${currentRootVectorHash},
+      current_state_refreshed_at = now(),
+      updated_at = now()
+    where chain_id = ${String(channel.chainId)}::bigint
+      and channel_id = ${channel.channelId}
+  `;
+}
+
+async function readAddress(
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+  address: Address,
+  functionName: string,
+  args: readonly unknown[] = [],
+) {
+  const value = await limitedRpc(limiter, () => client.readContract({
+    address,
+    abi: currentStateAbi as any,
+    functionName,
+    args,
+  } as any));
+  if (typeof value !== "string" || !value.startsWith("0x")) {
+    throw new Error(`RPC ${functionName} did not return an address.`);
+  }
+  return value as Address;
+}
+
+async function readHexString(
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+  address: Address,
+  functionName: string,
+  args: readonly unknown[] = [],
+) {
+  const value = await limitedRpc(limiter, () => client.readContract({
+    address,
+    abi: currentStateAbi as any,
+    functionName,
+    args,
+  } as any));
+  if (typeof value !== "string" || !value.startsWith("0x")) {
+    throw new Error(`RPC ${functionName} did not return a hex string.`);
+  }
+  return value;
+}
+
+async function readBigInt(
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+  address: Address,
+  functionName: string,
+  args: readonly unknown[] = [],
+) {
+  const value = await limitedRpc(limiter, () => client.readContract({
+    address,
+    abi: currentStateAbi as any,
+    functionName,
+    args,
+  } as any));
+  if (typeof value !== "bigint") {
+    throw new Error(`RPC ${functionName} did not return a uint256.`);
+  }
+  return value;
+}
+
+async function readDAppInfo(
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+  dAppManager: Address,
+  dappId: bigint,
+) {
+  const value = await limitedRpc(limiter, () => client.readContract({
+    address: dAppManager,
+    abi: currentStateAbi,
+    functionName: "getDAppInfo",
+    args: [dappId],
+  }));
+  const row = value as unknown as Record<string, unknown> & readonly unknown[];
+  const exists = row.exists ?? row[0];
+  if (exists !== true) {
+    throw new Error(`RPC getDAppInfo did not find dappId ${dappId.toString()}.`);
+  }
+  return {
+    metadataDigestSchema: requiredHexField(row, "metadataDigestSchema", 3),
+    metadataDigest: requiredHexField(row, "metadataDigest", 4),
+    functionRoot: requiredHexField(row, "functionRoot", 5),
+  };
+}
+
+async function readDAppVerifierSnapshot(
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+  dAppManager: Address,
+  dappId: bigint,
+) {
+  const value = await limitedRpc(limiter, () => client.readContract({
+    address: dAppManager,
+    abi: currentStateAbi,
+    functionName: "getDAppVerifierSnapshot",
+    args: [dappId],
+  }));
+  const row = value as unknown as Record<string, unknown> & readonly unknown[];
+  return {
+    grothVerifier: requiredAddressField(row, "grothVerifier", 0),
+    grothVerifierCompatibleBackendVersion: requiredStringField(row, "grothVerifierCompatibleBackendVersion", 1),
+    tokamakVerifier: requiredAddressField(row, "tokamakVerifier", 2),
+    tokamakVerifierCompatibleBackendVersion: requiredStringField(row, "tokamakVerifierCompatibleBackendVersion", 3),
+  };
+}
+
+async function readProxySlotAddress(
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+  address: Address,
+  slot: `0x${string}`,
+) {
+  const value = await limitedRpc(limiter, () => client.getStorageAt({ address, slot }));
+  if (!value || value === "0x" || BigInt(value) === 0n) {
+    return null;
+  }
+  return `0x${value.slice(-40)}` as Address;
+}
+
+function requiredHexField(row: Record<string, unknown> & readonly unknown[], name: string, index: number) {
+  const value = row[name] ?? row[index];
+  if (typeof value !== "string" || !value.startsWith("0x")) {
+    throw new Error(`RPC result field ${name} is not a hex string.`);
+  }
+  return value;
+}
+
+function requiredAddressField(row: Record<string, unknown> & readonly unknown[], name: string, index: number) {
+  return requiredHexField(row, name, index) as Address;
+}
+
+function requiredStringField(row: Record<string, unknown> & readonly unknown[], name: string, index: number) {
+  const value = row[name] ?? row[index];
+  if (typeof value !== "string") {
+    throw new Error(`RPC result field ${name} is not a string.`);
+  }
+  return value;
+}
+
+function lowerAddress(address: string) {
+  return address.toLowerCase();
 }
 
 async function importRawRpcCallHistory({

@@ -24,6 +24,9 @@ export type ObserverChannelConfig = {
   adminWallet: `0x${string}`;
 };
 
+export const DEPLOYMENT_ARTIFACTS_URL =
+  "https://drive.google.com/drive/u/0/folders/12HuHeR8vCWfkeGdjTAFKhv0FU-AG4aUJ";
+
 export const DEFAULT_OBSERVER_CHANNEL: ObserverChannelConfig = {
   slug: "the-great-first-channel",
   chainId: 1,
@@ -45,8 +48,7 @@ export const DEFAULT_OBSERVER_CHANNEL: ObserverChannelConfig = {
   grothVerifierVersion: "0.2",
   tokamakVerifier: "0xfC0BaCc0628BafAcB7Ce52fde21680caAA3cC9E1",
   tokamakVerifierVersion: "2.1",
-  sourceCodeUrl: "https://github.com/tokamak-network/Tokamak-zk-EVM-contracts",
-  abiUrl:
-    "https://github.com/tokamak-network/Tokamak-zk-EVM-contracts/tree/main/bridge/deployments",
+  sourceCodeUrl: DEPLOYMENT_ARTIFACTS_URL,
+  abiUrl: DEPLOYMENT_ARTIFACTS_URL,
   adminWallet: "0x850dD0721B93D455b55bdf1324595fA1BD2B3ce7",
 };

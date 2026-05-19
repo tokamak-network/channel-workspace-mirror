@@ -207,6 +207,7 @@ function SectionDetail({
             <InfoItem label="Creation tx" value={stats.channelCreated?.transaction_hash ?? "not indexed"} mono />
             <InfoItem label="Creator / leader" value={channel.leader ?? "unknown"} mono />
             <InfoItem label="Deployment block" value={channel.genesis_block} mono />
+            <InfoItem label="Current state refreshed" value={formatDate(channel.current_state_refreshed_at)} />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Contract Addresses">
@@ -215,6 +216,8 @@ function SectionDetail({
             <InfoItem label="BridgeCore" value={channel.bridge_core} mono />
             <InfoItem label="BridgeTokenVault" value={channel.bridge_token_vault} mono />
             <InfoItem label="ChannelManager" value={channel.channel_manager} mono />
+            <InfoItem label="DAppManager" value={channel.dapp_manager ?? "unknown"} mono />
+            <InfoItem label="ChannelDeployer" value={channel.channel_deployer ?? "unknown"} mono />
             <InfoItem label="Controller" value={channel.controller ?? "unknown"} mono />
             <InfoItem label="L2AccountingVault" value={channel.l2_accounting_vault ?? "unknown"} mono />
           </InfoGrid>
@@ -225,12 +228,14 @@ function SectionDetail({
             <InfoItem label="Accepted function root" value={channel.function_root ?? "unknown"} mono />
             <InfoItem label="DApp metadata hash" value={channel.dapp_metadata_digest ?? "unknown"} mono />
             <InfoItem label="DApp metadata schema" value={channel.dapp_metadata_digest_schema ?? "unknown"} mono />
+            <InfoItem label="Current root vector hash" value={channel.current_root_vector_hash ?? "unknown"} mono />
+            <InfoItem label="Current join toll" value={formatTokenAmount(channel.current_join_toll ?? "0")} />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Source & Artifacts">
           <InfoGrid>
-            <InfoItem label="Source code" value={<ExternalValue value={channel.source_code_url} />} />
-            <InfoItem label="ABI" value={<ExternalValue value={channel.abi_url} />} />
+            <InfoItem label="Deployment source" value={<ExternalValue value={channel.source_code_url} />} />
+            <InfoItem label="ABI / deployment artifacts" value={<ExternalValue value={channel.abi_url} />} />
             <InfoItem label="Source verification" value="not indexed" />
             <InfoItem label="Bytecode hash" value="not indexed" />
             <InfoItem label="Deployed Git commit" value="not indexed" />
@@ -343,8 +348,10 @@ function SectionDetail({
         <DetailSection title="Current Upgrade Surface">
           <InfoGrid>
             <InfoItem label="Proxy addresses" value="not indexed" />
-            <InfoItem label="Implementation addresses" value="not indexed" />
-            <InfoItem label="Proxy admin addresses" value="not indexed" />
+            <InfoItem label="BridgeCore implementation" value={channel.bridge_core_implementation ?? "not indexed"} mono />
+            <InfoItem label="BridgeCore proxy admin" value={channel.bridge_core_proxy_admin ?? "not indexed"} mono />
+            <InfoItem label="BridgeTokenVault implementation" value={channel.bridge_token_vault_implementation ?? "not indexed"} mono />
+            <InfoItem label="BridgeTokenVault proxy admin" value={channel.bridge_token_vault_proxy_admin ?? "not indexed"} mono />
             <InfoItem label="Owner / admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
             <InfoItem label="Multisig / timelock" value="not indexed" />
             <InfoItem label="Channel leader" value={channel.leader ?? "unknown"} mono />
@@ -353,6 +360,7 @@ function SectionDetail({
         <DetailSection title="Deployment Metadata">
           <InfoGrid>
             <InfoItem label="Deployment block" value={channel.genesis_block} mono />
+            <InfoItem label="Current state refreshed" value={formatDate(channel.current_state_refreshed_at)} />
             <InfoItem label="Deployed Git commit" value="not indexed" />
             <InfoItem label="NPM package version" value="not indexed" />
             <InfoItem label="Source verification" value="not indexed" />
@@ -395,8 +403,8 @@ function SectionDetail({
       </DetailSection>
       <DetailSection title="Reference Links">
         <InfoGrid>
-          <InfoItem label="Source code" value={<ExternalValue value={channel.source_code_url} />} />
-          <InfoItem label="ABI" value={<ExternalValue value={channel.abi_url} />} />
+          <InfoItem label="Deployment source" value={<ExternalValue value={channel.source_code_url} />} />
+          <InfoItem label="ABI / deployment artifacts" value={<ExternalValue value={channel.abi_url} />} />
           <InfoItem label="Explorer links" value="not indexed" />
           <InfoItem label="Monitoring packet / policy docs" value="not indexed" />
         </InfoGrid>
