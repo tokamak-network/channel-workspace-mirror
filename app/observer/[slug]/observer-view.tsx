@@ -314,24 +314,29 @@ function SectionDetail({
   if (sectionId === "events") {
     const eventCountSections = [
       {
-        id: "bridge-events",
-        title: "Bridge Events",
-        count: sumNamedEventCounts(stats.eventCounts, ["deposit", "withdrawal"]),
+        id: "bridge-event-list",
+        title: "Bridge deposits, withdrawals, tolls, and refunds",
+        count: dashboard.listTotals.bridgeEvents,
       },
       {
-        id: "participant-events",
-        title: "Participant Events",
-        count: sumNamedEventCounts(stats.eventCounts, ["participant"]),
+        id: "participant-event-list",
+        title: "Join, exit, address-pair, and public-key registration",
+        count: dashboard.listTotals.participantEvents,
       },
       {
-        id: "private-state-events",
-        title: "Private-State Public Signal Events",
-        count: sumNamedEventCounts(stats.eventCounts, [
-          "transition",
-          "commitment_or_nullifier",
-          "encrypted_payload",
-          "l2_accounting",
-        ]),
+        id: "transition-accounting-event-list",
+        title: "Accepted transitions and storage/accounting signals",
+        count: dashboard.listTotals.privateStateEvents,
+      },
+      {
+        id: "commitment-event-list",
+        title: "Commitments and nullifiers",
+        count: dashboard.listTotals.commitmentEvents,
+      },
+      {
+        id: "encrypted-payload-event-list",
+        title: "Encrypted payloads",
+        count: dashboard.listTotals.encryptedPayloadEvents,
       },
     ];
     return (
@@ -341,6 +346,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection id="bridge-events" title="Bridge Events">
           <EventTable
+            id="bridge-event-list"
             title="Bridge deposits, withdrawals, tolls, and refunds"
             events={lists.bridgeEvents}
             displayLimit={15}
@@ -352,6 +358,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection id="participant-events" title="Participant Events">
           <EventTable
+            id="participant-event-list"
             title="Join, exit, address-pair, and public-key registration"
             events={lists.participantEvents}
             displayLimit={15}
@@ -363,6 +370,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection id="private-state-events" title="Private-State Public Signal Events">
           <EventTable
+            id="transition-accounting-event-list"
             title="Accepted transitions and storage/accounting signals"
             events={lists.privateStateEvents}
             displayLimit={15}
@@ -372,6 +380,7 @@ function SectionDetail({
             basePath={eventPagePath}
           />
           <EventTable
+            id="commitment-event-list"
             title="Commitments and nullifiers"
             events={lists.commitmentEvents}
             displayLimit={15}
@@ -381,6 +390,7 @@ function SectionDetail({
             basePath={eventPagePath}
           />
           <EventTable
+            id="encrypted-payload-event-list"
             title="Encrypted payloads"
             events={lists.encryptedPayloadEvents}
             displayLimit={15}
@@ -562,6 +572,7 @@ function InfoItem({
 }
 
 function EventTable({
+  id,
   title,
   events,
   displayLimit,
@@ -570,6 +581,7 @@ function EventTable({
   searchParams,
   basePath,
 }: {
+  id?: string;
   title: string;
   events: ObserverEventRow[];
   displayLimit: number;
@@ -587,7 +599,7 @@ function EventTable({
   const endIndex = startIndex + visibleEvents.length;
   const rangeText = visibleEvents.length === 0 ? "0" : `${startIndex + 1}-${endIndex}`;
   return (
-    <section className="event-block">
+    <section className="event-block" id={id}>
       <div className="event-heading">
         <h3>{title}</h3>
         <span>{visibleEvents.length === eventCount ? eventCount : `${rangeText} of ${eventCount}`}</span>
@@ -743,13 +755,6 @@ function displayedEventCount(counts: Record<string, string>) {
   return Object.entries(counts)
     .filter(([group]) => isEventLogGroup(group))
     .map(([, count]) => count)
-    .reduce((total, value) => total + BigInt(value), 0n)
-    .toString();
-}
-
-function sumNamedEventCounts(counts: Record<string, string>, groups: string[]) {
-  return groups
-    .map((group) => counts[group] ?? "0")
     .reduce((total, value) => total + BigInt(value), 0n)
     .toString();
 }

@@ -131,7 +131,7 @@ dd {
 
 .event-count-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   width: 100%;
   background: #ffffff;

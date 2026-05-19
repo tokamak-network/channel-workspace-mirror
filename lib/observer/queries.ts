@@ -182,7 +182,7 @@ export async function getObserverDashboard(
     eventListByGroups(channel, ["participant"], pageFor(options, "participantEvents")),
     eventListRows(channel, { eventName: "StorageKeyObserved", ...pageFor(options, "commitmentEvents") }),
     eventListRows(channel, { eventName: "NoteValueEncrypted", ...pageFor(options, "encryptedPayloadEvents") }),
-    eventListByGroups(channel, ["transition", "commitment_or_nullifier", "encrypted_payload", "l2_accounting"], pageFor(options, "privateStateEvents")),
+    eventListByGroups(channel, ["transition", "l2_accounting"], pageFor(options, "privateStateEvents")),
     eventRows(channel, { eventGroup: "policy", limit: 100 }),
     eventRows(channel, { eventGroup: "transition", limit: 100 }),
     eventRows(channel, { eventGroup: "verifier", limit: 100 }),
