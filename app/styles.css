@@ -367,6 +367,74 @@ dd {
   white-space: nowrap;
 }
 
+.incident-list {
+  display: grid;
+  gap: 12px;
+}
+
+.incident-item {
+  background: #ffffff;
+  border: 1px solid #d8dee8;
+  padding: 14px;
+}
+
+.incident-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.incident-severity,
+.incident-status {
+  border: 1px solid #d8dee8;
+  color: #344054;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 7px;
+  text-transform: uppercase;
+}
+
+.severity-critical {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+.severity-warning {
+  border-color: #b54708;
+  color: #b54708;
+}
+
+.severity-info,
+.status-resolved {
+  border-color: #2f7d69;
+  color: #174f42;
+}
+
+.status-active {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+.incident-item h4 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.incident-item p {
+  color: #344054;
+  margin: 0 0 12px;
+}
+
+.incident-meta {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -539,6 +607,7 @@ td {
   .metric-grid,
   .metric-grid.compact,
   .event-count-summary,
+  .incident-meta,
   .summary-list {
     grid-template-columns: 1fr;
   }

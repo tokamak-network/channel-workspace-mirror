@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { ObserverDashboard, ObserverEventRow } from "@/lib/observer/queries";
+import type { ObserverDashboard, ObserverEventRow, ObserverIncidentRow } from "@/lib/observer/queries";
 
 type SectionId = "channel" | "bridge" | "participants" | "events" | "upgrades" | "notices";
 type ObserverSearchParams = Record<string, string | string[] | undefined>;
@@ -112,7 +112,7 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
           <InfoItem label="Admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
         </OverviewBlock>
         <OverviewBlock title="Notices" href={`/observer/${channel.slug}/notices`}>
-          <InfoItem label="Incident status" value={channel.incident_notice ?? "No active incident notices"} />
+          <InfoItem label="Active incidents" value={activeIncidentLabel(dashboard.incidents.active.length)} />
           <InfoItem label="Last indexed" value={formatDate(sync.updatedAt)} />
         </OverviewBlock>
       </section>
@@ -325,9 +325,24 @@ function SectionDetail({
         count: dashboard.listTotals.bridgeEvents,
       },
       {
-        id: "participant-event-list",
-        title: "Join, exit, address-pair, and public-key registration",
-        count: dashboard.listTotals.participantEvents,
+        id: "participant-join-event-list",
+        title: "Channel joins",
+        count: dashboard.listTotals.participantJoinEvents,
+      },
+      {
+        id: "participant-address-pair-event-list",
+        title: "Registered L1 / L2 address pairs",
+        count: dashboard.listTotals.participantAddressPairEvents,
+      },
+      {
+        id: "participant-public-key-event-list",
+        title: "Note-receive public keys",
+        count: dashboard.listTotals.participantPublicKeyEvents,
+      },
+      {
+        id: "participant-exit-event-list",
+        title: "Channel exits",
+        count: dashboard.listTotals.participantExitEvents,
       },
       {
         id: "transition-accounting-event-list",
@@ -364,12 +379,46 @@ function SectionDetail({
         </DetailSection>
         <DetailSection id="participant-events" title="Participant Events">
           <EventTable
-            id="participant-event-list"
-            title="Join, exit, address-pair, and public-key registration"
-            events={lists.participantEvents}
-            displayLimit={15}
-            totalCount={dashboard.listTotals.participantEvents}
-            pageParam="participantsPage"
+            id="participant-join-event-list"
+            title="Channel joins"
+            events={lists.participantJoinEvents}
+            displayLimit={10}
+            totalCount={dashboard.listTotals.participantJoinEvents}
+            pageParam="joinsPage"
+            decodedFields={["joinedAt", "leafIndex", "joinTollPaid"]}
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
+          <EventTable
+            id="participant-address-pair-event-list"
+            title="Registered L1 / L2 address pairs"
+            events={lists.participantAddressPairEvents}
+            displayLimit={10}
+            totalCount={dashboard.listTotals.participantAddressPairEvents}
+            pageParam="addressPairsPage"
+            decodedFields={["l1Address", "l2Address", "channelTokenVaultKey"]}
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
+          <EventTable
+            id="participant-public-key-event-list"
+            title="Note-receive public keys"
+            events={lists.participantPublicKeyEvents}
+            displayLimit={10}
+            totalCount={dashboard.listTotals.participantPublicKeyEvents}
+            pageParam="publicKeysPage"
+            decodedFields={["l1Address", "noteReceivePubKeyX", "noteReceivePubKeyYParity"]}
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
+          <EventTable
+            id="participant-exit-event-list"
+            title="Channel exits"
+            events={lists.participantExitEvents}
+            displayLimit={10}
+            totalCount={dashboard.listTotals.participantExitEvents}
+            pageParam="exitsPage"
+            decodedFields={["l1Address", "leafIndex"]}
             searchParams={searchParams}
             basePath={eventPagePath}
           />
@@ -457,11 +506,10 @@ function SectionDetail({
   return (
     <>
       <DetailSection title="Current Notices">
-        <InfoGrid>
-          <InfoItem label="Incident notices" value={channel.incident_notice ?? "No active incident notices"} />
-          <InfoItem label="Emergency notice status" value={channel.incident_notice ? "active" : "none"} />
-          <InfoItem label="Unaudited / experimental status" value="not indexed" />
-        </InfoGrid>
+        <IncidentList incidents={dashboard.incidents.active} emptyText="No active incident notices" />
+      </DetailSection>
+      <DetailSection title="Incident History">
+        <IncidentList incidents={dashboard.incidents.history} emptyText="No incident history" />
       </DetailSection>
       <DetailSection title="Monitoring Status">
         <InfoGrid>
@@ -555,6 +603,46 @@ function EventCountSummary({
   );
 }
 
+function IncidentList({
+  incidents,
+  emptyText,
+}: {
+  incidents: ObserverIncidentRow[];
+  emptyText: string;
+}) {
+  if (incidents.length === 0) {
+    return <p className="section-note">{emptyText}</p>;
+  }
+  return (
+    <div className="incident-list">
+      {incidents.map((incident) => (
+        <article className="incident-item" key={incident.id}>
+          <div className="incident-heading">
+            <span className={`incident-severity severity-${incident.severity}`}>{incident.severity}</span>
+            <span className={`incident-status status-${incident.status}`}>{incident.status}</span>
+          </div>
+          <h4>{incident.title}</h4>
+          <p>{incident.body}</p>
+          <dl className="incident-meta">
+            <InfoItem label="Opened" value={formatDate(incident.opened_at)} />
+            <InfoItem label="Resolved" value={incident.resolved_at ? formatDate(incident.resolved_at) : "not resolved"} />
+            {incident.reference_url ? (
+              <InfoItem
+                label="Reference"
+                value={
+                  <a href={incident.reference_url} rel="noreferrer" target="_blank">
+                    {incident.reference_url}
+                  </a>
+                }
+              />
+            ) : null}
+          </dl>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function InfoGrid({ children }: { children: ReactNode }) {
   return <dl className="info-grid">{children}</dl>;
 }
@@ -585,6 +673,7 @@ function EventTable({
   pageParam,
   searchParams,
   basePath,
+  decodedFields,
 }: {
   id?: string;
   title: string;
@@ -594,11 +683,12 @@ function EventTable({
   pageParam?: string;
   searchParams?: ObserverSearchParams;
   basePath?: string;
+  decodedFields?: string[];
 }) {
   const eventCount = Number.parseInt(totalCount ?? String(events.length), 10);
   const requestedPage = pageParam ? parsePageNumber(searchParams?.[pageParam]) : 1;
   const totalPages = Math.max(Math.ceil(eventCount / displayLimit), 1);
-  const currentPage = requestedPage;
+  const currentPage = Math.min(requestedPage, totalPages);
   const startIndex = (currentPage - 1) * displayLimit;
   const visibleEvents = pageParam ? events : events.slice(startIndex, startIndex + displayLimit);
   const endIndex = startIndex + visibleEvents.length;
@@ -640,7 +730,7 @@ function EventTable({
                   </td>
                   <td className="mono">{shortHash(event.transaction_hash)}</td>
                   <td>
-                    <DecodedFields value={event.decoded} />
+                    <DecodedFields fields={decodedFields} value={event.decoded} />
                   </td>
                 </tr>
               ))
@@ -651,17 +741,17 @@ function EventTable({
       {pageParam && basePath && totalPages > 1 ? (
         <nav className="event-pagination" aria-label={`${title} pagination`}>
           {currentPage > 1 ? (
-            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage - 1)}>Previous 15</Link>
+            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage - 1)}>Previous {displayLimit}</Link>
           ) : (
-            <span aria-disabled="true">Previous 15</span>
+            <span aria-disabled="true">Previous {displayLimit}</span>
           )}
           <span>
             Page {currentPage} of {totalPages}
           </span>
           {currentPage < totalPages ? (
-            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage + 1)}>Next 15</Link>
+            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage + 1)}>Next {displayLimit}</Link>
           ) : (
-            <span aria-disabled="true">Next 15</span>
+            <span aria-disabled="true">Next {displayLimit}</span>
           )}
         </nav>
       ) : null}
@@ -669,8 +759,10 @@ function EventTable({
   );
 }
 
-function DecodedFields({ value }: { value: Record<string, unknown> }) {
-  const entries = Object.entries(value).slice(0, 8);
+function DecodedFields({ fields, value }: { fields?: string[]; value: Record<string, unknown> }) {
+  const entries = fields
+    ? fields.map((field) => [field, value[field]] as const)
+    : Object.entries(value).slice(0, 8);
   if (entries.length === 0) {
     return <span className="muted">empty</span>;
   }
@@ -876,6 +968,10 @@ function formatDecodedValue(value: unknown) {
   }
   const json = JSON.stringify(value);
   return json.length > 120 ? `${json.slice(0, 117)}...` : json;
+}
+
+function activeIncidentLabel(count: number) {
+  return count === 0 ? "No active incident notices" : `${count} active incident${count === 1 ? "" : "s"}`;
 }
 
 function displayedEventCount(counts: Record<string, string>) {

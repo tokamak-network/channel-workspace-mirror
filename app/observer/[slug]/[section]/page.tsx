@@ -2,13 +2,26 @@ import { notFound } from "next/navigation";
 import { getObserverDashboard, type ObserverEventListName, type ObserverEventListPage } from "@/lib/observer/queries";
 import { isObserverSection, ObserverSectionPage } from "../observer-view";
 
-const EVENT_PAGE_SIZE = 15;
 const EVENT_PAGE_PARAMS: Record<ObserverEventListName, string> = {
   bridgeEvents: "bridgePage",
-  participantEvents: "participantsPage",
+  participantJoinEvents: "joinsPage",
+  participantAddressPairEvents: "addressPairsPage",
+  participantPublicKeyEvents: "publicKeysPage",
+  participantExitEvents: "exitsPage",
   commitmentEvents: "commitmentsPage",
   encryptedPayloadEvents: "encryptedPayloadsPage",
   privateStateEvents: "privateStatePage",
+};
+
+const EVENT_PAGE_SIZES: Record<ObserverEventListName, number> = {
+  bridgeEvents: 15,
+  participantJoinEvents: 10,
+  participantAddressPairEvents: 10,
+  participantPublicKeyEvents: 10,
+  participantExitEvents: 10,
+  commitmentEvents: 15,
+  encryptedPayloadEvents: 15,
+  privateStateEvents: 15,
 };
 
 export default async function ObserverChannelSectionPage({
@@ -41,8 +54,8 @@ function eventListPages(searchParams: Record<string, string | string[] | undefin
       return [
         listName,
         {
-          limit: EVENT_PAGE_SIZE,
-          offset: (page - 1) * EVENT_PAGE_SIZE,
+          limit: EVENT_PAGE_SIZES[listName as ObserverEventListName],
+          offset: (page - 1) * EVENT_PAGE_SIZES[listName as ObserverEventListName],
         },
       ];
     }),

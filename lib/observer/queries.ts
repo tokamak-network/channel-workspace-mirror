@@ -48,9 +48,27 @@ export type ObserverEventRow = {
   decoded: Record<string, unknown>;
 };
 
+export type ObserverIncidentRow = {
+  id: string;
+  chain_id: string;
+  channel_id: string;
+  status: string;
+  severity: string;
+  title: string;
+  body: string;
+  reference_url: string | null;
+  opened_at: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ObserverEventListName =
   | "bridgeEvents"
-  | "participantEvents"
+  | "participantJoinEvents"
+  | "participantAddressPairEvents"
+  | "participantPublicKeyEvents"
+  | "participantExitEvents"
   | "commitmentEvents"
   | "encryptedPayloadEvents"
   | "privateStateEvents";
@@ -83,7 +101,10 @@ export type ObserverDashboard = {
   };
   lists: {
     bridgeEvents: ObserverEventRow[];
-    participantEvents: ObserverEventRow[];
+    participantJoinEvents: ObserverEventRow[];
+    participantAddressPairEvents: ObserverEventRow[];
+    participantPublicKeyEvents: ObserverEventRow[];
+    participantExitEvents: ObserverEventRow[];
     commitmentEvents: ObserverEventRow[];
     nullifierEvents: ObserverEventRow[];
     encryptedPayloadEvents: ObserverEventRow[];
@@ -93,6 +114,10 @@ export type ObserverDashboard = {
     verifierEvents: ObserverEventRow[];
     adminEvents: ObserverEventRow[];
     upgradeEvents: ObserverEventRow[];
+  };
+  incidents: {
+    active: ObserverIncidentRow[];
+    history: ObserverIncidentRow[];
   };
   listTotals: Record<ObserverEventListName, string>;
 };
@@ -168,7 +193,10 @@ export async function getObserverDashboard(
 
   const [
     bridgeList,
-    participantList,
+    participantJoinList,
+    participantAddressPairList,
+    participantPublicKeyList,
+    participantExitList,
     storageList,
     encryptedPayloadList,
     privateStateList,
@@ -177,9 +205,14 @@ export async function getObserverDashboard(
     verifierEvents,
     adminEvents,
     upgradeEvents,
+    activeIncidents,
+    incidentHistory,
   ] = await Promise.all([
     eventListByGroups(channel, ["deposit", "withdrawal"], pageFor(options, "bridgeEvents")),
-    eventListByGroups(channel, ["participant"], pageFor(options, "participantEvents")),
+    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", ...pageFor(options, "participantJoinEvents") }),
+    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", ...pageFor(options, "participantAddressPairEvents") }),
+    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", ...pageFor(options, "participantPublicKeyEvents") }),
+    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityExited", ...pageFor(options, "participantExitEvents") }),
     eventListRows(channel, { eventName: "StorageKeyObserved", ...pageFor(options, "commitmentEvents") }),
     eventListRows(channel, { eventName: "NoteValueEncrypted", ...pageFor(options, "encryptedPayloadEvents") }),
     eventListByGroups(channel, ["transition", "l2_accounting"], pageFor(options, "privateStateEvents")),
@@ -188,6 +221,8 @@ export async function getObserverDashboard(
     eventRows(channel, { eventGroup: "verifier", limit: 100 }),
     eventRows(channel, { eventGroup: "admin", limit: 100 }),
     eventRows(channel, { eventGroup: "upgrade", limit: 100 }),
+    incidentRows(channel, { activeOnly: true, limit: 20 }),
+    incidentRows(channel, { limit: 100 }),
   ]);
 
   const eventCounts: Record<string, string> = {};
@@ -214,7 +249,10 @@ export async function getObserverDashboard(
     },
     lists: {
       bridgeEvents: bridgeList.rows,
-      participantEvents: participantList.rows,
+      participantJoinEvents: participantJoinList.rows,
+      participantAddressPairEvents: participantAddressPairList.rows,
+      participantPublicKeyEvents: participantPublicKeyList.rows,
+      participantExitEvents: participantExitList.rows,
       commitmentEvents: storageList.rows,
       nullifierEvents: storageList.rows,
       encryptedPayloadEvents: encryptedPayloadList.rows,
@@ -225,9 +263,16 @@ export async function getObserverDashboard(
       adminEvents,
       upgradeEvents,
     },
+    incidents: {
+      active: activeIncidents,
+      history: incidentHistory,
+    },
     listTotals: {
       bridgeEvents: bridgeList.totalCount,
-      participantEvents: participantList.totalCount,
+      participantJoinEvents: participantJoinList.totalCount,
+      participantAddressPairEvents: participantAddressPairList.totalCount,
+      participantPublicKeyEvents: participantPublicKeyList.totalCount,
+      participantExitEvents: participantExitList.totalCount,
       commitmentEvents: storageList.totalCount,
       encryptedPayloadEvents: encryptedPayloadList.totalCount,
       privateStateEvents: privateStateList.totalCount,
@@ -349,6 +394,36 @@ async function eventCount(
       and (cardinality(${excludedGroups}::text[]) = 0 or event_group <> all(${excludedGroups}::text[]))
   ` as { count: string }[];
   return rows[0]?.count ?? "0";
+}
+
+async function incidentRows(
+  channel: ObserverChannelRow,
+  filters: { activeOnly?: boolean; limit?: number },
+) {
+  const sql = getSql();
+  const limit = Math.min(Math.max(filters.limit ?? 100, 1), 500);
+  const rows = await sql`
+    select
+      id::text,
+      chain_id::text,
+      channel_id,
+      status,
+      severity,
+      title,
+      body,
+      reference_url,
+      opened_at,
+      resolved_at,
+      created_at,
+      updated_at
+    from observer_incidents
+    where chain_id = ${channel.chain_id}::bigint
+      and channel_id = ${channel.channel_id}
+      and (${filters.activeOnly ?? false}::boolean = false or status = 'active')
+    order by opened_at desc, id desc
+    limit ${String(limit)}::integer
+  ` as ObserverIncidentRow[];
+  return rows;
 }
 
 function pageFor(options: ObserverDashboardOptions, listName: ObserverEventListName): ObserverEventListPage {
