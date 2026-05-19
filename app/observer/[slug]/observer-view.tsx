@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { ObserverDashboard, ObserverEventRow } from "@/lib/observer/queries";
 
 type SectionId = "channel" | "bridge" | "participants" | "events" | "upgrades" | "notices";
+type ObserverSearchParams = Record<string, string | string[] | undefined>;
 
 type ObserverSectionDefinition = {
   id: SectionId;
@@ -113,9 +114,11 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
 export function ObserverSectionPage({
   dashboard,
   sectionId,
+  searchParams = {},
 }: {
   dashboard: ObserverDashboard;
   sectionId: SectionId;
+  searchParams?: ObserverSearchParams;
 }) {
   const section = observerSections.find((item) => item.id === sectionId);
   if (!section) {
@@ -131,7 +134,7 @@ export function ObserverSectionPage({
         <span>{section.title}</span>
       </nav>
       <ObserverSection title={section.title} summary={section.summary}>
-        <SectionDetail dashboard={dashboard} sectionId={sectionId} />
+        <SectionDetail dashboard={dashboard} sectionId={sectionId} searchParams={searchParams} />
       </ObserverSection>
     </main>
   );
@@ -187,12 +190,15 @@ function ObserverNav({
 function SectionDetail({
   dashboard,
   sectionId,
+  searchParams,
 }: {
   dashboard: ObserverDashboard;
   sectionId: SectionId;
+  searchParams: ObserverSearchParams;
 }) {
   const { channel, stats, lists } = dashboard;
   const verifierVersion = `Tokamak ${channel.tokamak_verifier_version ?? "unknown"} / Groth16 ${channel.groth_verifier_version ?? "unknown"}`;
+  const eventPagePath = `/observer/${channel.slug}/events`;
 
   if (sectionId === "channel") {
     return (
@@ -317,15 +323,55 @@ function SectionDetail({
           </section>
         </DetailSection>
         <DetailSection title="Bridge Events">
-          <EventTable title="Bridge deposits, withdrawals, tolls, and refunds" events={lists.bridgeEvents} displayLimit={15} />
+          <EventTable
+            title="Bridge deposits, withdrawals, tolls, and refunds"
+            events={lists.bridgeEvents}
+            displayLimit={15}
+            totalCount={dashboard.listTotals.bridgeEvents}
+            pageParam="bridgePage"
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
         </DetailSection>
         <DetailSection title="Participant Events">
-          <EventTable title="Join, exit, address-pair, and public-key registration" events={lists.participantEvents} displayLimit={15} />
+          <EventTable
+            title="Join, exit, address-pair, and public-key registration"
+            events={lists.participantEvents}
+            displayLimit={15}
+            totalCount={dashboard.listTotals.participantEvents}
+            pageParam="participantsPage"
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
         </DetailSection>
         <DetailSection title="Private-State Public Signal Events">
-          <EventTable title="Accepted transitions and storage/accounting signals" events={lists.privateStateEvents} displayLimit={15} />
-          <EventTable title="Commitments and nullifiers" events={lists.commitmentEvents} displayLimit={15} />
-          <EventTable title="Encrypted payloads" events={lists.encryptedPayloadEvents} displayLimit={15} />
+          <EventTable
+            title="Accepted transitions and storage/accounting signals"
+            events={lists.privateStateEvents}
+            displayLimit={15}
+            totalCount={dashboard.listTotals.privateStateEvents}
+            pageParam="privateStatePage"
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
+          <EventTable
+            title="Commitments and nullifiers"
+            events={lists.commitmentEvents}
+            displayLimit={15}
+            totalCount={dashboard.listTotals.commitmentEvents}
+            pageParam="commitmentsPage"
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
+          <EventTable
+            title="Encrypted payloads"
+            events={lists.encryptedPayloadEvents}
+            displayLimit={15}
+            totalCount={dashboard.listTotals.encryptedPayloadEvents}
+            pageParam="encryptedPayloadsPage"
+            searchParams={searchParams}
+            basePath={eventPagePath}
+          />
         </DetailSection>
       </>
     );
@@ -485,17 +531,32 @@ function EventTable({
   title,
   events,
   displayLimit,
+  totalCount,
+  pageParam,
+  searchParams,
+  basePath,
 }: {
   title: string;
   events: ObserverEventRow[];
   displayLimit: number;
+  totalCount?: string;
+  pageParam?: string;
+  searchParams?: ObserverSearchParams;
+  basePath?: string;
 }) {
-  const visibleEvents = events.slice(0, displayLimit);
+  const eventCount = Number.parseInt(totalCount ?? String(events.length), 10);
+  const requestedPage = pageParam ? parsePageNumber(searchParams?.[pageParam]) : 1;
+  const totalPages = Math.max(Math.ceil(eventCount / displayLimit), 1);
+  const currentPage = requestedPage;
+  const startIndex = (currentPage - 1) * displayLimit;
+  const visibleEvents = pageParam ? events : events.slice(startIndex, startIndex + displayLimit);
+  const endIndex = startIndex + visibleEvents.length;
+  const rangeText = visibleEvents.length === 0 ? "0" : `${startIndex + 1}-${endIndex}`;
   return (
     <section className="event-block">
       <div className="event-heading">
         <h3>{title}</h3>
-        <span>{visibleEvents.length === events.length ? events.length : `${visibleEvents.length} of ${events.length}`}</span>
+        <span>{visibleEvents.length === eventCount ? eventCount : `${rangeText} of ${eventCount}`}</span>
       </div>
       <div className="table-wrap">
         <table className="event-table">
@@ -536,6 +597,23 @@ function EventTable({
           </tbody>
         </table>
       </div>
+      {pageParam && basePath && totalPages > 1 ? (
+        <nav className="event-pagination" aria-label={`${title} pagination`}>
+          {currentPage > 1 ? (
+            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage - 1)}>Previous 15</Link>
+          ) : (
+            <span aria-disabled="true">Previous 15</span>
+          )}
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+          {currentPage < totalPages ? (
+            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage + 1)}>Next 15</Link>
+          ) : (
+            <span aria-disabled="true">Next 15</span>
+          )}
+        </nav>
+      ) : null}
     </section>
   );
 }
@@ -637,4 +715,33 @@ function displayedEventCount(counts: Record<string, string>) {
 
 function displayedEventGroupCount(counts: Record<string, string>) {
   return String(Object.keys(counts).filter(isEventLogGroup).length);
+}
+
+function parsePageNumber(value: string | string[] | undefined) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const page = Number.parseInt(rawValue ?? "1", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
+
+function pageHref(
+  basePath: string,
+  searchParams: ObserverSearchParams,
+  pageParam: string,
+  page: number,
+) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value === undefined || key === pageParam) {
+      continue;
+    }
+    const values = Array.isArray(value) ? value : [value];
+    for (const item of values) {
+      params.append(key, item);
+    }
+  }
+  if (page > 1) {
+    params.set(pageParam, String(page));
+  }
+  const query = params.toString();
+  return query ? `${basePath}?${query}` : basePath;
 }

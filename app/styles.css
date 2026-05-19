@@ -346,6 +346,38 @@ dd {
   overflow-x: auto;
 }
 
+.event-pagination {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+.event-pagination a,
+.event-pagination span {
+  border: 1px solid #d8dee8;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.event-pagination a:hover {
+  border-color: #2f7d69;
+  color: #174f42;
+}
+
+.event-pagination span[aria-disabled="true"] {
+  color: #9aa3b2;
+}
+
+.event-pagination span:not([aria-disabled="true"]) {
+  border-color: transparent;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
