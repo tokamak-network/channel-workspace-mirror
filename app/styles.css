@@ -126,11 +126,17 @@ dd {
 }
 
 .event-count-grid {
-  display: grid;
+  align-self: stretch;
+  display: flex;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  justify-self: stretch;
   margin: 0;
   width: 100%;
+}
+
+.event-count-grid .metric {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .metric {
@@ -486,8 +492,11 @@ td {
   .status-strip,
   .metric-grid,
   .metric-grid.compact,
-  .event-count-grid,
   .summary-list {
     grid-template-columns: 1fr;
+  }
+
+  .event-count-grid {
+    flex-direction: column;
   }
 }
