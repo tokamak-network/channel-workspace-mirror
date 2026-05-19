@@ -48,17 +48,17 @@ code {
 .observer-shell {
   display: block;
   place-items: initial;
-  max-width: 1180px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 40px 24px 56px;
+  padding: 36px 24px 64px;
 }
 
 .observer-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 28px;
   align-items: start;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .eyebrow {
@@ -71,25 +71,16 @@ code {
 }
 
 .lede {
-  max-width: 820px;
+  max-width: 720px;
   color: #3f4754;
 }
 
-.sync-panel,
-.metric,
-.observer-section {
-  border: 1px solid #d9dde5;
-  background: #ffffff;
-  border-radius: 8px;
-}
-
-.sync-panel {
+.status-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin: 0;
-  padding: 18px;
-}
-
-.sync-panel div + div {
-  margin-top: 16px;
+  padding: 0;
 }
 
 dt,
@@ -102,7 +93,7 @@ dd {
   margin: 4px 0 0;
 }
 
-.sync-panel dd,
+.status-strip dd,
 .metric strong {
   display: block;
   overflow-wrap: anywhere;
@@ -110,11 +101,22 @@ dd {
   line-height: 1.35;
 }
 
+.status-strip .info-item,
+.metric {
+  border: 1px solid #d9dde5;
+  background: #ffffff;
+  border-radius: 8px;
+}
+
+.status-strip .info-item {
+  padding: 14px;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin-bottom: 20px;
+  margin: 0 0 22px;
 }
 
 .metric-grid.compact {
@@ -127,25 +129,82 @@ dd {
 }
 
 .observer-section {
-  padding: 20px;
-  margin-top: 16px;
+  border-top: 1px solid #d9dde5;
+  padding: 26px 0 6px;
+  margin-top: 22px;
 }
 
-.observer-section h2 {
-  font-size: 18px;
-  margin: 0 0 14px;
-}
-
-.key-values {
+.section-heading {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 24px;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 22px;
+  margin-bottom: 18px;
 }
 
-.key-values dd {
+.section-eyebrow {
+  color: #5d6675;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 4px 0 0;
+  text-transform: uppercase;
+}
+
+.section-heading h2 {
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+.section-heading p {
+  color: #4c5563;
+  font-size: 14px;
+}
+
+.section-body {
+  display: grid;
+  gap: 18px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.info-item dd {
   overflow-wrap: anywhere;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
+  line-height: 1.45;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.event-block {
+  max-width: none;
+  border-top: 1px solid #e3e7ee;
+  padding-top: 14px;
+}
+
+.event-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.event-heading h3 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.event-heading span {
+  color: #5d6675;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .table-wrap {
@@ -156,6 +215,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+  background: #ffffff;
 }
 
 th,
@@ -187,17 +247,51 @@ td:nth-child(2) {
 
 td:nth-child(3) {
   width: 150px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-td code {
-  white-space: normal;
+.event-name {
+  display: block;
+  font-weight: 700;
+}
+
+.event-group {
+  display: block;
+  color: #5d6675;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.decoded-fields {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.decoded-fields div {
+  display: grid;
+  grid-template-columns: minmax(86px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.decoded-fields dt,
+.decoded-fields dd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.decoded-fields dd {
   overflow-wrap: anywhere;
+}
+
+.muted {
+  color: #5d6675;
 }
 
 @media (max-width: 860px) {
   .observer-header,
-  .key-values,
+  .section-heading,
+  .info-grid,
+  .status-strip,
   .metric-grid,
   .metric-grid.compact {
     grid-template-columns: 1fr;
