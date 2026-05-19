@@ -249,10 +249,8 @@ function SectionDetail({
         </DetailSection>
         <DetailSection title="Source & Artifacts">
           <InfoGrid>
-            <InfoItem label="Deployment source" value={<ExternalValue value={channel.source_code_url} />} />
-            <InfoItem label="ABI / deployment artifacts" value={<ExternalValue value={channel.abi_url} />} />
+            <InfoItem label="Deployment Artifacts & Commits" value={<ExternalLinks links={deploymentArtifactLinks(channel)} />} />
             <InfoItem label="Source verification & Bytecode hash" value={<ExternalLinks links={sourceAndBytecodeLinks(channel)} />} />
-            <InfoItem label="Deployed Git commit" value={<ExternalLinks links={deploymentCommitArtifactLinks(channel)} />} />
             <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
           </InfoGrid>
         </DetailSection>
@@ -437,7 +435,7 @@ function SectionDetail({
           <InfoGrid>
             <InfoItem label="Deployment block" value={channel.genesis_block} mono />
             <InfoItem label="Current state refreshed" value={formatDate(channel.current_state_refreshed_at)} />
-            <InfoItem label="Deployed Git commit" value={<ExternalLinks links={deploymentCommitArtifactLinks(channel)} />} />
+            <InfoItem label="Deployment Artifacts & Commits" value={<ExternalLinks links={deploymentArtifactLinks(channel)} />} />
             <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
             <InfoItem label="Source verification & Bytecode hash" value={<ExternalLinks links={sourceAndBytecodeLinks(channel)} />} />
           </InfoGrid>
@@ -479,8 +477,7 @@ function SectionDetail({
       </DetailSection>
       <DetailSection title="Reference Links">
         <InfoGrid>
-          <InfoItem label="Deployment source" value={<ExternalValue value={channel.source_code_url} />} />
-          <InfoItem label="ABI / deployment artifacts" value={<ExternalValue value={channel.abi_url} />} />
+          <InfoItem label="Deployment Artifacts & Commits" value={<ExternalLinks links={deploymentArtifactLinks(channel)} />} />
           <InfoItem label="Explorer links" value={<ExternalLinks links={explorerLinks(channel)} />} />
           <InfoItem label="Monitoring packet / policy docs" value={<ExternalLinks links={monitoringPolicyLinks()} />} />
         </InfoGrid>
@@ -689,17 +686,6 @@ function DecodedFields({ value }: { value: Record<string, unknown> }) {
   );
 }
 
-function ExternalValue({ value }: { value: string | null }) {
-  if (!value) {
-    return "unavailable";
-  }
-  return (
-    <a href={value} rel="noreferrer" target="_blank">
-      {value}
-    </a>
-  );
-}
-
 function ExternalLinks({ links }: { links: ExternalLinkItem[] }) {
   const availableLinks = links.filter((link): link is { label: string; value: string } => Boolean(link.value));
   if (availableLinks.length === 0) {
@@ -741,8 +727,16 @@ function explorerLinks(channel: ObserverChannel): ExternalLinkItem[] {
   ];
 }
 
-function deploymentCommitArtifactLinks(channel: ObserverChannel): ExternalLinkItem[] {
+function deploymentArtifactLinks(channel: ObserverChannel): ExternalLinkItem[] {
   return [
+    {
+      label: "Deployment source",
+      value: channel.source_code_url,
+    },
+    {
+      label: "ABI / deployment artifacts",
+      value: channel.abi_url,
+    },
     {
       label: "bridge.1.json",
       value: channel.abi_url,
