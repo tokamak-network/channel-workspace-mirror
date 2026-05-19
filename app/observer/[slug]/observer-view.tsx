@@ -423,11 +423,11 @@ function SectionDetail({
         </DetailSection>
         <DetailSection title="Current Upgrade Surface">
           <InfoGrid>
-            <InfoItem label="Proxy addresses" value="not indexed" />
+            <InfoItem label="BridgeCore proxy" value={channel.bridge_core} mono />
             <InfoItem label="BridgeCore implementation" value={channel.bridge_core_implementation ?? "not indexed"} mono />
+            <InfoItem label="BridgeTokenVault proxy" value={channel.bridge_token_vault} mono />
             <InfoItem label="BridgeTokenVault implementation" value={channel.bridge_token_vault_implementation ?? "not indexed"} mono />
             <InfoItem label="Owner / admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
-            <InfoItem label="Multisig / timelock" value="not indexed" />
             <InfoItem label="Channel leader" value={channel.leader ?? "unknown"} mono />
           </InfoGrid>
         </DetailSection>
