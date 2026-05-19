@@ -55,6 +55,7 @@ export type ObserverDashboard = {
     eventCounts: Record<string, string>;
   };
   lists: {
+    bridgeEvents: ObserverEventRow[];
     channelJoins: ObserverEventRow[];
     registeredAddressPairs: ObserverEventRow[];
     noteReceivePublicKeys: ObserverEventRow[];
@@ -127,12 +128,14 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
   ]);
 
   const [
+    bridgeEvents,
     channelJoins,
     storageEvents,
     encryptedPayloadEvents,
     upgradeHistory,
     recentEvents,
   ] = await Promise.all([
+    eventRowsByGroups(channel, ["deposit", "withdrawal"], 100),
     eventRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", limit: 100 }),
     eventRows(channel, { eventName: "StorageKeyObserved", limit: 100 }),
     eventRows(channel, { eventName: "NoteValueEncrypted", limit: 100 }),
@@ -160,6 +163,7 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
       eventCounts,
     },
     lists: {
+      bridgeEvents,
       channelJoins,
       registeredAddressPairs: channelJoins,
       noteReceivePublicKeys: channelJoins,
@@ -206,6 +210,34 @@ async function eventRows(
       and channel_id = ${channel.channel_id}
       and (${filters.eventGroup ?? null}::text is null or event_group = ${filters.eventGroup ?? null})
       and (${filters.eventName ?? null}::text is null or event_name = ${filters.eventName ?? null})
+    order by block_number desc, log_index desc
+    limit ${String(limit)}::integer
+  ` as ObserverEventRow[];
+  return rows;
+}
+
+async function eventRowsByGroups(
+  channel: ObserverChannelRow,
+  eventGroups: string[],
+  limitValue: number,
+) {
+  const sql = getSql();
+  const limit = Math.min(Math.max(limitValue, 1), 500);
+  const rows = await sql`
+    select
+      id::text,
+      block_number::text,
+      block_timestamp,
+      transaction_hash,
+      log_index,
+      contract_address,
+      event_name,
+      event_group,
+      decoded
+    from observer_events
+    where chain_id = ${channel.chain_id}::bigint
+      and channel_id = ${channel.channel_id}
+      and event_group = any(${eventGroups}::text[])
     order by block_number desc, log_index desc
     limit ${String(limit)}::integer
   ` as ObserverEventRow[];

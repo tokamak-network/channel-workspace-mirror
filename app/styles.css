@@ -48,17 +48,17 @@ code {
 .observer-shell {
   display: block;
   place-items: initial;
-  max-width: 1240px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 36px 24px 64px;
+  padding: 32px 24px 64px;
 }
 
 .observer-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
-  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+  gap: 32px;
   align-items: start;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
 .eyebrow {
@@ -73,6 +73,7 @@ code {
 .lede {
   max-width: 720px;
   color: #3f4754;
+  font-size: 15px;
 }
 
 .status-strip {
@@ -116,7 +117,7 @@ dd {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin: 0 0 22px;
+  margin: 0 0 18px;
 }
 
 .metric-grid.compact {
@@ -125,13 +126,131 @@ dd {
 }
 
 .metric {
-  padding: 16px;
+  padding: 15px;
+}
+
+.overview-panel {
+  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+  gap: 24px;
+  align-items: start;
+  border: 1px solid #cdd6e3;
+  border-left: 5px solid #1f6f5c;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.overview-primary h2 {
+  font-size: 24px;
+  margin: 0 0 8px;
+}
+
+.overview-primary p {
+  color: #4c5563;
+  font-size: 14px;
+}
+
+.summary-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+}
+
+.summary-list .info-item {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.section-index {
+  max-width: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 26px;
+}
+
+.section-card {
+  display: grid;
+  gap: 7px;
+  min-height: 136px;
+  padding: 15px;
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  text-decoration: none;
+}
+
+.section-card:hover {
+  border-color: #8390a3;
+}
+
+.section-card span,
+.section-card em {
+  color: #5d6675;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.section-card strong {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.section-card small {
+  color: #3f4754;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.section-card em {
+  align-self: end;
+  color: #8a4b0f;
+}
+
+.overview-grid {
+  max-width: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview-block {
+  max-width: none;
+  border-top: 1px solid #d9dde5;
+  padding-top: 16px;
+}
+
+.overview-block-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.overview-block-heading h2 {
+  font-size: 17px;
+  margin: 0;
+}
+
+.overview-block-heading a,
+.breadcrumb a,
+.section-tabs a {
+  font-weight: 700;
 }
 
 .observer-section {
   border-top: 1px solid #d9dde5;
-  padding: 26px 0 6px;
-  margin-top: 22px;
+  padding: 24px 0 6px;
+  margin-top: 14px;
 }
 
 .section-heading {
@@ -163,6 +282,47 @@ dd {
 .section-body {
   display: grid;
   gap: 18px;
+}
+
+.breadcrumb {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #5d6675;
+  font-size: 13px;
+  margin: 8px 0 18px;
+}
+
+.breadcrumb span::before {
+  content: "/";
+  margin-right: 10px;
+  color: #9aa3b1;
+}
+
+.section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.section-tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d9dde5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #364052;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.section-tabs a.active {
+  border-color: #1f6f5c;
+  background: #eaf5f1;
+  color: #174f42;
 }
 
 .info-grid {
@@ -216,6 +376,7 @@ table {
   border-collapse: collapse;
   table-layout: fixed;
   background: #ffffff;
+  border: 1px solid #e7eaf0;
 }
 
 th,
@@ -289,11 +450,15 @@ td:nth-child(3) {
 
 @media (max-width: 860px) {
   .observer-header,
+  .overview-panel,
+  .overview-grid,
   .section-heading,
   .info-grid,
   .status-strip,
   .metric-grid,
-  .metric-grid.compact {
+  .metric-grid.compact,
+  .section-index,
+  .summary-list {
     grid-template-columns: 1fr;
   }
 }
