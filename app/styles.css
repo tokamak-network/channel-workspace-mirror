@@ -373,16 +373,16 @@ td {
   font-size: 13px;
 }
 
-td:nth-child(1) {
-  width: 100px;
+.event-table-block {
+  width: 96px;
 }
 
-td:nth-child(2) {
-  width: 210px;
+.event-table-name {
+  width: 300px;
 }
 
-td:nth-child(3) {
-  width: 150px;
+.event-table-transaction {
+  width: 180px;
 }
 
 .event-name {
@@ -400,16 +400,17 @@ td:nth-child(3) {
 
 .decoded-fields {
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 8px;
   margin: 0;
 }
 
 .decoded-fields div {
-  display: grid;
-  grid-template-columns: minmax(86px, 0.42fr) minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
   min-width: 0;
+  border: 1px solid #e7eaf0;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 6px 8px;
 }
 
 .decoded-fields dt,
@@ -420,10 +421,15 @@ td:nth-child(3) {
 }
 
 .decoded-fields dt {
+  color: #5d6675;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
 .decoded-fields dd {
+  margin-top: 3px;
+  color: #16181d;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 

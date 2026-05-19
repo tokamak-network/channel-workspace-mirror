@@ -501,7 +501,13 @@ function EventTable({
         <span>{visibleEvents.length === events.length ? events.length : `${visibleEvents.length} of ${events.length}`}</span>
       </div>
       <div className="table-wrap">
-        <table>
+        <table className="event-table">
+          <colgroup>
+            <col className="event-table-block" />
+            <col className="event-table-name" />
+            <col className="event-table-transaction" />
+            <col className="event-table-fields" />
+          </colgroup>
           <thead>
             <tr>
               <th>Block</th>
