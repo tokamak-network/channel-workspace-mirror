@@ -13,32 +13,32 @@ type ObserverSectionDefinition = {
 export const observerSections: ObserverSectionDefinition[] = [
   {
     id: "channel",
-    title: "채널 고정 정보",
+    title: "Channel Profile",
     summary: "Channel identity, contract addresses, policy snapshot, and published artifacts.",
   },
   {
     id: "bridge",
-    title: "브릿지 현황",
+    title: "Bridge Status",
     summary: "Public L1 bridge totals, bridge contracts, and the transparent entry/exit boundary.",
   },
   {
     id: "participants",
-    title: "참여자들",
+    title: "Participants",
     summary: "Participant counts, registration surface, and public participant data scope.",
   },
   {
     id: "events",
-    title: "이벤트 로그들",
+    title: "Event Logs",
     summary: "Bridge, participant, private-state signal, and recent public event logs.",
   },
   {
     id: "upgrades",
-    title: "업그레이드 히스토리",
+    title: "Upgrade History",
     summary: "Current verification stack, upgrade surface, deployment metadata, and policy/verification/admin events.",
   },
   {
     id: "notices",
-    title: "공지사항",
+    title: "Notices",
     summary: "Incident notices, monitoring status, public data scope, and reference links.",
   },
 ];
@@ -81,27 +81,27 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
       </section>
 
       <section className="overview-grid" aria-label="Key public records">
-        <OverviewBlock title="채널 고정 정보" href={`/observer/${channel.slug}/channel`}>
+        <OverviewBlock title="Channel Profile" href={`/observer/${channel.slug}/channel`}>
           <InfoItem label="Channel ID" value={channel.channel_id} mono />
           <InfoItem label="DApp ID" value={channel.dapp_id} mono />
         </OverviewBlock>
-        <OverviewBlock title="브릿지 현황" href={`/observer/${channel.slug}/bridge`}>
+        <OverviewBlock title="Bridge Status" href={`/observer/${channel.slug}/bridge`}>
           <InfoItem label="Deposits" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
           <InfoItem label="Withdrawals" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
         </OverviewBlock>
-        <OverviewBlock title="참여자들" href={`/observer/${channel.slug}/participants`}>
+        <OverviewBlock title="Participants" href={`/observer/${channel.slug}/participants`}>
           <InfoItem label="Active" value={stats.channelParticipantsCount} />
           <InfoItem label="Joined" value={stats.joinedParticipantsCount} />
         </OverviewBlock>
-        <OverviewBlock title="이벤트 로그들" href={`/observer/${channel.slug}/events`}>
+        <OverviewBlock title="Event Logs" href={`/observer/${channel.slug}/events`}>
           <InfoItem label="Indexed events" value={sumEventCounts(stats.eventCounts)} />
           <InfoItem label="Recent public records" value={String(lists.recentEvents.length)} />
         </OverviewBlock>
-        <OverviewBlock title="업그레이드 히스토리" href={`/observer/${channel.slug}/upgrades`}>
+        <OverviewBlock title="Upgrade History" href={`/observer/${channel.slug}/upgrades`}>
           <InfoItem label="Tokamak verifier" value={channel.tokamak_verifier ?? "unknown"} mono />
           <InfoItem label="Admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
         </OverviewBlock>
-        <OverviewBlock title="공지사항" href={`/observer/${channel.slug}/notices`}>
+        <OverviewBlock title="Notices" href={`/observer/${channel.slug}/notices`}>
           <InfoItem label="Incident status" value={channel.incident_notice ?? "No active incident notices"} />
           <InfoItem label="Last indexed" value={formatDate(sync.updatedAt)} />
         </OverviewBlock>
@@ -127,7 +127,7 @@ export function ObserverSectionPage({
       <ObserverHeader dashboard={dashboard} />
       <ObserverNav channelSlug={dashboard.channel.slug} activeSection={sectionId} />
       <nav className="breadcrumb" aria-label="Observer navigation">
-        <Link href={`/observer/${dashboard.channel.slug}`}>메인</Link>
+        <Link href={`/observer/${dashboard.channel.slug}`}>Overview</Link>
         <span>{section.title}</span>
       </nav>
       <ObserverSection title={section.title} summary={section.summary}>
@@ -169,7 +169,7 @@ function ObserverNav({
   return (
     <nav className="observer-nav" aria-label="Observer sections">
       <Link className={!activeSection ? "active" : undefined} href={`/observer/${channelSlug}`}>
-        메인
+        Overview
       </Link>
       {observerSections.map((section) => (
         <Link
@@ -261,7 +261,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection title="Event Log Link">
           <p className="section-note">
-            Deposit, withdrawal, join toll, and exit refund events are listed under <Link href={`/observer/${channel.slug}/events`}>이벤트 로그들</Link>.
+            Deposit, withdrawal, join toll, and exit refund events are listed under <Link href={`/observer/${channel.slug}/events`}>Event Logs</Link>.
           </p>
         </DetailSection>
       </>
@@ -293,7 +293,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection title="Event Log Link">
           <p className="section-note">
-            Join, exit, address-pair, and note-receive public key records are listed under <Link href={`/observer/${channel.slug}/events`}>이벤트 로그들</Link>.
+            Join, exit, address-pair, and note-receive public key records are listed under <Link href={`/observer/${channel.slug}/events`}>Event Logs</Link>.
           </p>
         </DetailSection>
       </>
