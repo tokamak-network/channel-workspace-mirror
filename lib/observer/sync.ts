@@ -81,17 +81,13 @@ const TARGETED_EVENTS = [
 ] as const;
 
 const currentStateAbi = parseAbi([
-  "function canonicalAsset() view returns (address)",
   "function bridgeTokenVault() view returns (address)",
-  "function dAppManager() view returns (address)",
   "function channelDeployer() view returns (address)",
-  "function getChannelManager(uint256 channelId) view returns (address)",
   "function grothVerifier() view returns (address)",
   "function tokamakVerifier() view returns (address)",
   "function owner() view returns (address)",
   "function channelId() view returns (uint256)",
   "function dappId() view returns (uint256)",
-  "function leader() view returns (address)",
   "function dappMetadataDigestSchema() view returns (bytes32)",
   "function dappMetadataDigest() view returns (bytes32)",
   "function functionRoot() view returns (bytes32)",
@@ -163,6 +159,7 @@ async function upsertChannel(channel: ObserverChannelConfig) {
       bridge_core,
       channel_manager,
       bridge_token_vault,
+      dapp_manager,
       canonical_asset,
       controller,
       l2_accounting_vault,
@@ -189,6 +186,7 @@ async function upsertChannel(channel: ObserverChannelConfig) {
       ${channel.bridgeCore},
       ${channel.channelManager},
       ${channel.bridgeTokenVault},
+      ${channel.dAppManager},
       ${channel.canonicalAsset},
       ${channel.controller},
       ${channel.l2AccountingVault},
@@ -213,6 +211,7 @@ async function upsertChannel(channel: ObserverChannelConfig) {
       bridge_core = excluded.bridge_core,
       channel_manager = excluded.channel_manager,
       bridge_token_vault = excluded.bridge_token_vault,
+      dapp_manager = excluded.dapp_manager,
       canonical_asset = excluded.canonical_asset,
       controller = excluded.controller,
       l2_accounting_vault = excluded.l2_accounting_vault,
@@ -237,24 +236,17 @@ async function refreshChannelCurrentState(
   limiter: RpcRateLimiter,
 ) {
   const bridgeCore = channel.bridgeCore;
-  const configuredChannelId = BigInt(channel.channelId);
   const dappId = BigInt(channel.dappId);
 
   const [
-    canonicalAsset,
     bridgeTokenVaultFromCore,
-    dAppManager,
     channelDeployer,
-    currentChannelManager,
     bridgeOwner,
     bridgeCoreImplementation,
     bridgeTokenVaultImplementation,
   ] = await Promise.all([
-    readAddress(client, limiter, bridgeCore, "canonicalAsset"),
     readAddress(client, limiter, bridgeCore, "bridgeTokenVault"),
-    readAddress(client, limiter, bridgeCore, "dAppManager"),
     readAddress(client, limiter, bridgeCore, "channelDeployer"),
-    readAddress(client, limiter, bridgeCore, "getChannelManager", [configuredChannelId]),
     readAddress(client, limiter, bridgeCore, "owner"),
     readProxySlotAddress(client, limiter, bridgeCore, ERC1967_IMPLEMENTATION_SLOT),
     readProxySlotAddress(client, limiter, channel.bridgeTokenVault, ERC1967_IMPLEMENTATION_SLOT),
@@ -262,7 +254,6 @@ async function refreshChannelCurrentState(
 
   const [
     channelDAppId,
-    channelLeader,
     channelBridgeTokenVault,
     channelMetadataDigestSchema,
     channelMetadataDigest,
@@ -272,16 +263,15 @@ async function refreshChannelCurrentState(
     dAppInfo,
     dAppVerifierSnapshot,
   ] = await Promise.all([
-    readBigInt(client, limiter, currentChannelManager, "dappId"),
-    readAddress(client, limiter, currentChannelManager, "leader"),
-    readAddress(client, limiter, currentChannelManager, "bridgeTokenVault"),
-    readHexString(client, limiter, currentChannelManager, "dappMetadataDigestSchema"),
-    readHexString(client, limiter, currentChannelManager, "dappMetadataDigest"),
-    readHexString(client, limiter, currentChannelManager, "functionRoot"),
-    readHexString(client, limiter, currentChannelManager, "currentRootVectorHash"),
-    readBigInt(client, limiter, currentChannelManager, "joinToll"),
-    readDAppInfo(client, limiter, dAppManager, dappId),
-    readDAppVerifierSnapshot(client, limiter, dAppManager, dappId),
+    readBigInt(client, limiter, channel.channelManager, "dappId"),
+    readAddress(client, limiter, channel.channelManager, "bridgeTokenVault"),
+    readHexString(client, limiter, channel.channelManager, "dappMetadataDigestSchema"),
+    readHexString(client, limiter, channel.channelManager, "dappMetadataDigest"),
+    readHexString(client, limiter, channel.channelManager, "functionRoot"),
+    readHexString(client, limiter, channel.channelManager, "currentRootVectorHash"),
+    readBigInt(client, limiter, channel.channelManager, "joinToll"),
+    readDAppInfo(client, limiter, channel.dAppManager, dappId),
+    readDAppVerifierSnapshot(client, limiter, channel.dAppManager, dappId),
   ]);
 
   if (channelDAppId !== dappId) {
@@ -302,12 +292,8 @@ async function refreshChannelCurrentState(
   await sql`
     update observer_channels
     set
-      canonical_asset = ${canonicalAsset},
-      channel_manager = ${currentChannelManager},
       bridge_token_vault = ${bridgeTokenVaultFromCore},
-      dapp_manager = ${dAppManager},
       channel_deployer = ${channelDeployer},
-      leader = ${channelLeader},
       dapp_metadata_digest_schema = ${dAppInfo.metadataDigestSchema},
       dapp_metadata_digest = ${dAppInfo.metadataDigest},
       function_root = ${dAppInfo.functionRoot},

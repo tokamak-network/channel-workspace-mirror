@@ -8,6 +8,7 @@ export type ObserverChannelConfig = {
   bridgeCore: `0x${string}`;
   channelManager: `0x${string}`;
   bridgeTokenVault: `0x${string}`;
+  dAppManager: `0x${string}`;
   canonicalAsset: `0x${string}`;
   controller: `0x${string}`;
   l2AccountingVault: `0x${string}`;
@@ -37,6 +38,7 @@ export const DEFAULT_OBSERVER_CHANNEL: ObserverChannelConfig = {
   bridgeCore: "0x992E2Ae206620d811832a8F697c526c4f95974b6",
   channelManager: "0x3108d92A38bFb4B3396DE7ad4D92318a8fbE61D7",
   bridgeTokenVault: "0xf127Aef661c815ad46c5159146078f6F1E9f5F61",
+  dAppManager: "0x88Ab290a9dc0a169240EBC282Ec1F7C8524645aA",
   canonicalAsset: "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5",
   controller: "0x67C6233A99D9f122Fef9DC111e89948107b34c2F",
   l2AccountingVault: "0x9A6c9eb158269BBEd8885649F95aCEFA8AAfC3aA",
