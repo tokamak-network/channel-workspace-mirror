@@ -251,8 +251,7 @@ function SectionDetail({
           <InfoGrid>
             <InfoItem label="Deployment source" value={<ExternalValue value={channel.source_code_url} />} />
             <InfoItem label="ABI / deployment artifacts" value={<ExternalValue value={channel.abi_url} />} />
-            <InfoItem label="Source verification" value={<ExternalLinks links={sourceVerificationLinks(channel)} />} />
-            <InfoItem label="Bytecode hash" value={<ExternalLinks links={bytecodeReferenceLinks(channel)} />} />
+            <InfoItem label="Source verification & Bytecode hash" value={<ExternalLinks links={sourceAndBytecodeLinks(channel)} />} />
             <InfoItem label="Deployed Git commit" value={<ExternalLinks links={deploymentCommitArtifactLinks(channel)} />} />
             <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
           </InfoGrid>
@@ -440,7 +439,7 @@ function SectionDetail({
             <InfoItem label="Current state refreshed" value={formatDate(channel.current_state_refreshed_at)} />
             <InfoItem label="Deployed Git commit" value={<ExternalLinks links={deploymentCommitArtifactLinks(channel)} />} />
             <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
-            <InfoItem label="Source verification" value={<ExternalLinks links={sourceVerificationLinks(channel)} />} />
+            <InfoItem label="Source verification & Bytecode hash" value={<ExternalLinks links={sourceAndBytecodeLinks(channel)} />} />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Policy Events">
@@ -725,16 +724,9 @@ function NpmPackageVersion() {
   );
 }
 
-function sourceVerificationLinks(channel: ObserverChannel): ExternalLinkItem[] {
+function sourceAndBytecodeLinks(channel: ObserverChannel): ExternalLinkItem[] {
   return contractCodeLinks(channel).map((link) => ({
-    label: `${link.label} source`,
-    value: link.value,
-  }));
-}
-
-function bytecodeReferenceLinks(channel: ObserverChannel): ExternalLinkItem[] {
-  return contractCodeLinks(channel).map((link) => ({
-    label: `${link.label} bytecode`,
+    label: link.label,
     value: link.value,
   }));
 }
