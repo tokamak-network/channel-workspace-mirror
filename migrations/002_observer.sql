@@ -5,6 +5,7 @@ create table if not exists observer_channels (
   name text not null,
   dapp_id bigint not null,
   genesis_block bigint not null,
+  channel_registration_tx text,
   bridge_core text not null,
   channel_manager text not null,
   bridge_token_vault text not null,

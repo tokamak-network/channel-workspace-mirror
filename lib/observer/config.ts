@@ -5,6 +5,7 @@ export type ObserverChannelConfig = {
   name: string;
   dappId: number;
   genesisBlock: bigint;
+  channelRegistrationTx: `0x${string}`;
   bridgeCore: `0x${string}`;
   channelManager: `0x${string}`;
   bridgeTokenVault: `0x${string}`;
@@ -35,6 +36,7 @@ export const DEFAULT_OBSERVER_CHANNEL: ObserverChannelConfig = {
   name: "the-great-first-channel",
   dappId: 1,
   genesisBlock: 25018368n,
+  channelRegistrationTx: "0xa5f1529cd8e5c62d46eb0eca2b2de6d317569d9e2776f3feff5bba4fa27656ee",
   bridgeCore: "0x992E2Ae206620d811832a8F697c526c4f95974b6",
   channelManager: "0x3108d92A38bFb4B3396DE7ad4D92318a8fbE61D7",
   bridgeTokenVault: "0xf127Aef661c815ad46c5159146078f6F1E9f5F61",

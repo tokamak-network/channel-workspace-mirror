@@ -48,9 +48,9 @@ export function isObserverSection(value: string): value is SectionId {
 }
 
 export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }) {
-  const { channel, sync, stats, lists } = dashboard;
+  const { channel, sync, stats } = dashboard;
   const latestBlock = stats.latestAcceptedTransition?.block_number ?? "none";
-  const totalEvents = sumEventCounts(stats.eventCounts);
+  const totalEvents = displayedEventCount(stats.eventCounts);
 
   return (
     <main className="observer-shell">
@@ -94,8 +94,8 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
           <InfoItem label="Joined" value={stats.joinedParticipantsCount} />
         </OverviewBlock>
         <OverviewBlock title="Event Logs" href={`/observer/${channel.slug}/events`}>
-          <InfoItem label="Indexed events" value={sumEventCounts(stats.eventCounts)} />
-          <InfoItem label="Recent public records" value={String(lists.recentEvents.length)} />
+          <InfoItem label="Displayed events" value={displayedEventCount(stats.eventCounts)} />
+          <InfoItem label="Event groups" value={displayedEventGroupCount(stats.eventCounts)} />
         </OverviewBlock>
         <OverviewBlock title="Upgrade History" href={`/observer/${channel.slug}/upgrades`}>
           <InfoItem label="Tokamak verifier" value={channel.tokamak_verifier ?? "unknown"} mono />
@@ -204,7 +204,7 @@ function SectionDetail({
             <InfoItem label="Chain ID" value={channel.chain_id} mono />
             <InfoItem label="DApp ID" value={channel.dapp_id} mono />
             <InfoItem label="DApp label" value="private-state DApp" />
-            <InfoItem label="Creation tx" value={stats.channelCreated?.transaction_hash ?? "not indexed"} mono />
+            <InfoItem label="Channel registration tx" value={channel.channel_registration_tx ?? "not configured"} mono />
             <InfoItem label="Creator / leader" value={channel.leader ?? "unknown"} mono />
             <InfoItem label="Deployment block" value={channel.genesis_block} mono />
             <InfoItem label="Current state refreshed" value={formatDate(channel.current_state_refreshed_at)} />
@@ -306,7 +306,7 @@ function SectionDetail({
   }
 
   if (sectionId === "events") {
-    const eventCounts = Object.entries(stats.eventCounts).filter(([group]) => !isUpgradeEventGroup(group));
+    const eventCounts = Object.entries(stats.eventCounts).filter(([group]) => isEventLogGroup(group));
     return (
       <>
         <DetailSection title="Event Counts">
@@ -326,9 +326,6 @@ function SectionDetail({
           <EventTable title="Accepted transitions and storage/accounting signals" events={lists.privateStateEvents} displayLimit={50} />
           <EventTable title="Commitments and nullifiers" events={lists.commitmentEvents} displayLimit={50} />
           <EventTable title="Encrypted payloads" events={lists.encryptedPayloadEvents} displayLimit={50} />
-        </DetailSection>
-        <DetailSection title="Raw Recent Events">
-          <EventTable title="Recent public events excluding policy, verification, admin, and upgrade events" events={lists.recentEvents} displayLimit={50} />
         </DetailSection>
       </>
     );
@@ -608,6 +605,10 @@ function isUpgradeEventGroup(value: string) {
   return value === "policy" || value === "verifier" || value === "admin" || value === "upgrade";
 }
 
+function isEventLogGroup(value: string) {
+  return !isUpgradeEventGroup(value) && value !== "mirror" && value !== "channel_registration";
+}
+
 function subtractTokenAmounts(left: string, right: string) {
   return (BigInt(left.split(".")[0] || "0") - BigInt(right.split(".")[0] || "0")).toString();
 }
@@ -626,8 +627,14 @@ function formatDecodedValue(value: unknown) {
   return json.length > 120 ? `${json.slice(0, 117)}...` : json;
 }
 
-function sumEventCounts(counts: Record<string, string>) {
-  return Object.values(counts)
+function displayedEventCount(counts: Record<string, string>) {
+  return Object.entries(counts)
+    .filter(([group]) => isEventLogGroup(group))
+    .map(([, count]) => count)
     .reduce((total, value) => total + BigInt(value), 0n)
     .toString();
+}
+
+function displayedEventGroupCount(counts: Record<string, string>) {
+  return String(Object.keys(counts).filter(isEventLogGroup).length);
 }

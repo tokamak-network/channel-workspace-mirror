@@ -7,6 +7,7 @@ export type ObserverChannelRow = {
   name: string;
   dapp_id: string;
   genesis_block: string;
+  channel_registration_tx: string | null;
   bridge_core: string;
   channel_manager: string;
   bridge_token_vault: string;
@@ -76,7 +77,6 @@ export type ObserverDashboard = {
     verifierEvents: ObserverEventRow[];
     adminEvents: ObserverEventRow[];
     upgradeEvents: ObserverEventRow[];
-    recentEvents: ObserverEventRow[];
   };
 };
 
@@ -157,7 +157,6 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
     verifierEvents,
     adminEvents,
     upgradeEvents,
-    recentEvents,
   ] = await Promise.all([
     eventRowsByGroups(channel, ["deposit", "withdrawal"], 100),
     eventRowsByGroups(channel, ["participant"], 100),
@@ -169,7 +168,6 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
     eventRows(channel, { eventGroup: "verifier", limit: 100 }),
     eventRows(channel, { eventGroup: "admin", limit: 100 }),
     eventRows(channel, { eventGroup: "upgrade", limit: 100 }),
-    eventRows(channel, { excludedGroups: ["policy", "verifier", "admin", "upgrade"], limit: 100 }),
   ]);
 
   const eventCounts: Record<string, string> = {};
@@ -206,7 +204,6 @@ export async function getObserverDashboard(slug: string): Promise<ObserverDashbo
       verifierEvents,
       adminEvents,
       upgradeEvents,
-      recentEvents,
     },
   };
 }
