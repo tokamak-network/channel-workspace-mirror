@@ -199,6 +199,7 @@ dd {
 }
 
 .observer-section {
+  max-width: none;
   border-top: 1px solid #d9dde5;
   padding: 24px 0 6px;
   margin-top: 14px;
@@ -387,6 +388,7 @@ td:nth-child(3) {
 .event-name {
   display: block;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .event-group {
@@ -406,12 +408,19 @@ td:nth-child(3) {
   display: grid;
   grid-template-columns: minmax(86px, 0.42fr) minmax(0, 1fr);
   gap: 8px;
+  align-items: start;
+  min-width: 0;
 }
 
 .decoded-fields dt,
 .decoded-fields dd {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+  min-width: 0;
+}
+
+.decoded-fields dt {
+  overflow-wrap: anywhere;
 }
 
 .decoded-fields dd {
