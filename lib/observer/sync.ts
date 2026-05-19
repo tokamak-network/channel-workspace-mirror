@@ -86,6 +86,7 @@ const currentStateAbi = parseAbi([
   "function grothVerifier() view returns (address)",
   "function tokamakVerifier() view returns (address)",
   "function owner() view returns (address)",
+  "function getChannel(uint256 channelId) view returns ((bool exists,uint256 dappId,address leader,address asset,address manager,address bridgeTokenVault,bytes32 aPubBlockHash,bytes32 dappMetadataDigestSchema,bytes32 dappMetadataDigest))",
   "function channelId() view returns (uint256)",
   "function dappId() view returns (uint256)",
   "function dappMetadataDigestSchema() view returns (bytes32)",
@@ -164,7 +165,6 @@ async function upsertChannel(channel: ObserverChannelConfig) {
       canonical_asset,
       controller,
       l2_accounting_vault,
-      leader,
       dapp_metadata_digest_schema,
       dapp_metadata_digest,
       function_root,
@@ -192,7 +192,6 @@ async function upsertChannel(channel: ObserverChannelConfig) {
       ${channel.canonicalAsset},
       ${channel.controller},
       ${channel.l2AccountingVault},
-      ${channel.leader},
       ${channel.dappMetadataDigestSchema},
       ${channel.dappMetadataDigest},
       ${channel.functionRoot},
@@ -218,7 +217,6 @@ async function upsertChannel(channel: ObserverChannelConfig) {
       canonical_asset = excluded.canonical_asset,
       controller = excluded.controller,
       l2_accounting_vault = excluded.l2_accounting_vault,
-      leader = excluded.leader,
       dapp_metadata_digest_schema = excluded.dapp_metadata_digest_schema,
       dapp_metadata_digest = excluded.dapp_metadata_digest,
       function_root = excluded.function_root,
@@ -247,12 +245,14 @@ async function refreshChannelCurrentState(
     bridgeOwner,
     bridgeCoreImplementation,
     bridgeTokenVaultImplementation,
+    channelDeployment,
   ] = await Promise.all([
     readAddress(client, limiter, bridgeCore, "bridgeTokenVault"),
     readAddress(client, limiter, bridgeCore, "channelDeployer"),
     readAddress(client, limiter, bridgeCore, "owner"),
     readProxySlotAddress(client, limiter, bridgeCore, ERC1967_IMPLEMENTATION_SLOT),
     readProxySlotAddress(client, limiter, channel.bridgeTokenVault, ERC1967_IMPLEMENTATION_SLOT),
+    readChannelDeployment(client, limiter, bridgeCore, dappId, BigInt(channel.channelId)),
   ]);
 
   const [
@@ -280,8 +280,17 @@ async function refreshChannelCurrentState(
   if (channelDAppId !== dappId) {
     throw new Error(`RPC channel dappId mismatch: expected ${dappId.toString()}, got ${channelDAppId.toString()}.`);
   }
+  if (lowerAddress(channelDeployment.manager) !== lowerAddress(channel.channelManager)) {
+    throw new Error(`RPC channel manager mismatch between config and BridgeCore.`);
+  }
+  if (lowerAddress(channelDeployment.asset) !== lowerAddress(channel.canonicalAsset)) {
+    throw new Error(`RPC channel canonical asset mismatch between config and BridgeCore.`);
+  }
   if (lowerAddress(channelBridgeTokenVault) !== lowerAddress(bridgeTokenVaultFromCore)) {
     throw new Error(`RPC bridgeTokenVault mismatch between BridgeCore and ChannelManager.`);
+  }
+  if (lowerAddress(channelDeployment.bridgeTokenVault) !== lowerAddress(bridgeTokenVaultFromCore)) {
+    throw new Error(`RPC bridgeTokenVault mismatch between BridgeCore channel metadata and BridgeCore state.`);
   }
   if (
     channelMetadataDigestSchema !== dAppInfo.metadataDigestSchema
@@ -290,6 +299,12 @@ async function refreshChannelCurrentState(
   ) {
     throw new Error("RPC DApp metadata mismatch between DAppManager and ChannelManager.");
   }
+  if (
+    channelDeployment.dappMetadataDigestSchema !== dAppInfo.metadataDigestSchema
+    || channelDeployment.dappMetadataDigest !== dAppInfo.metadataDigest
+  ) {
+    throw new Error("RPC DApp metadata mismatch between BridgeCore channel metadata and DAppManager.");
+  }
 
   const sql = getSql();
   await sql`
@@ -297,6 +312,7 @@ async function refreshChannelCurrentState(
     set
       bridge_token_vault = ${bridgeTokenVaultFromCore},
       channel_deployer = ${channelDeployer},
+      leader = ${channelDeployment.leader},
       dapp_metadata_digest_schema = ${dAppInfo.metadataDigestSchema},
       dapp_metadata_digest = ${dAppInfo.metadataDigest},
       function_root = ${dAppInfo.functionRoot},
@@ -397,6 +413,39 @@ async function readDAppInfo(
   };
 }
 
+async function readChannelDeployment(
+  client: ReturnType<typeof createPublicClient>,
+  limiter: RpcRateLimiter,
+  bridgeCore: Address,
+  expectedDappId: bigint,
+  channelId: bigint,
+) {
+  const value = await limitedRpc(limiter, () => client.readContract({
+    address: bridgeCore,
+    abi: currentStateAbi,
+    functionName: "getChannel",
+    args: [channelId],
+  }));
+  const row = value as unknown as Record<string, unknown> & readonly unknown[];
+  const exists = row.exists ?? row[0];
+  if (exists !== true) {
+    throw new Error(`RPC getChannel did not find channelId ${channelId.toString()}.`);
+  }
+  const dappId = requiredBigIntField(row, "dappId", 1);
+  if (dappId !== expectedDappId) {
+    throw new Error(`RPC getChannel dappId mismatch: expected ${expectedDappId.toString()}, got ${dappId.toString()}.`);
+  }
+  return {
+    dappId,
+    leader: requiredAddressField(row, "leader", 2),
+    asset: requiredAddressField(row, "asset", 3),
+    manager: requiredAddressField(row, "manager", 4),
+    bridgeTokenVault: requiredAddressField(row, "bridgeTokenVault", 5),
+    dappMetadataDigestSchema: requiredHexField(row, "dappMetadataDigestSchema", 7),
+    dappMetadataDigest: requiredHexField(row, "dappMetadataDigest", 8),
+  };
+}
+
 async function readDAppVerifierSnapshot(
   client: ReturnType<typeof createPublicClient>,
   limiter: RpcRateLimiter,
@@ -441,6 +490,14 @@ function requiredHexField(row: Record<string, unknown> & readonly unknown[], nam
 
 function requiredAddressField(row: Record<string, unknown> & readonly unknown[], name: string, index: number) {
   return requiredHexField(row, name, index) as Address;
+}
+
+function requiredBigIntField(row: Record<string, unknown> & readonly unknown[], name: string, index: number) {
+  const value = row[name] ?? row[index];
+  if (typeof value !== "bigint") {
+    throw new Error(`RPC result field ${name} is not a uint256.`);
+  }
+  return value;
 }
 
 function requiredStringField(row: Record<string, unknown> & readonly unknown[], name: string, index: number) {

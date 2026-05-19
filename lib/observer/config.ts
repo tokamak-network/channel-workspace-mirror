@@ -13,7 +13,6 @@ export type ObserverChannelConfig = {
   canonicalAsset: `0x${string}`;
   controller: `0x${string}`;
   l2AccountingVault: `0x${string}`;
-  leader: `0x${string}`;
   dappMetadataDigestSchema: `0x${string}`;
   dappMetadataDigest: `0x${string}`;
   functionRoot: `0x${string}`;
@@ -44,7 +43,6 @@ export const DEFAULT_OBSERVER_CHANNEL: ObserverChannelConfig = {
   canonicalAsset: "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5",
   controller: "0x67C6233A99D9f122Fef9DC111e89948107b34c2F",
   l2AccountingVault: "0x9A6c9eb158269BBEd8885649F95aCEFA8AAfC3aA",
-  leader: "0x32e6EE3d9820F0843E3e596132368747d36425F0",
   dappMetadataDigestSchema: "0xc2d8278e5129f8263782de4f76198a90fe23bf8f776c3f3bbe2835174c5cad92",
   dappMetadataDigest: "0x24ce1b24d4b0c085b713574c3f1eb8861ac18200263a3d20da1b87ce56c2fe04",
   functionRoot: "0x6954ea4661cff62a888de1898b69fa5b9861bcebc33a966c7b02b65ac10f1f6e",
