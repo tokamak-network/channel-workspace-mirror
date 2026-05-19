@@ -131,36 +131,46 @@ dd {
 
 .event-count-summary {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0;
   width: 100%;
   background: #ffffff;
   border: 1px solid #d9dde5;
 }
 
-.event-count-summary div {
+.event-count-summary a {
+  color: inherit;
+  display: block;
   min-width: 0;
   padding: 12px 14px;
+  text-decoration: none;
 }
 
-.event-count-summary div + div {
+.event-count-summary a + a {
   border-left: 1px solid #e7eaf0;
 }
 
-.event-count-summary dt {
+.event-count-summary a:hover,
+.event-count-summary a:focus-visible {
+  background: #f8fafc;
+}
+
+.event-count-summary span {
   color: #5d6675;
+  display: block;
   font-size: 12px;
   font-weight: 700;
   line-height: 1.25;
   text-transform: uppercase;
 }
 
-.event-count-summary dd {
+.event-count-summary strong {
   color: #16181d;
+  display: block;
   font-size: 20px;
   font-weight: 800;
   line-height: 1.2;
-  margin: 6px 0 0;
+  margin-top: 6px;
 }
 
 .overview-panel {
@@ -523,7 +533,7 @@ td {
     grid-template-columns: 1fr;
   }
 
-  .event-count-summary div + div {
+  .event-count-summary a + a {
     border-left: 0;
     border-top: 1px solid #e7eaf0;
   }

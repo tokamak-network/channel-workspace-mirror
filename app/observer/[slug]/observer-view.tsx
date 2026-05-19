@@ -312,13 +312,34 @@ function SectionDetail({
   }
 
   if (sectionId === "events") {
-    const eventCounts = Object.entries(stats.eventCounts).filter(([group]) => isEventLogGroup(group));
+    const eventCountSections = [
+      {
+        id: "bridge-events",
+        title: "Bridge Events",
+        count: sumNamedEventCounts(stats.eventCounts, ["deposit", "withdrawal"]),
+      },
+      {
+        id: "participant-events",
+        title: "Participant Events",
+        count: sumNamedEventCounts(stats.eventCounts, ["participant"]),
+      },
+      {
+        id: "private-state-events",
+        title: "Private-State Public Signal Events",
+        count: sumNamedEventCounts(stats.eventCounts, [
+          "transition",
+          "commitment_or_nullifier",
+          "encrypted_payload",
+          "l2_accounting",
+        ]),
+      },
+    ];
     return (
       <>
-        <DetailSection title="Event Counts">
-          <EventCountSummary counts={eventCounts} />
+        <DetailSection id="event-counts" title="Event Counts">
+          <EventCountSummary items={eventCountSections} />
         </DetailSection>
-        <DetailSection title="Bridge Events">
+        <DetailSection id="bridge-events" title="Bridge Events">
           <EventTable
             title="Bridge deposits, withdrawals, tolls, and refunds"
             events={lists.bridgeEvents}
@@ -329,7 +350,7 @@ function SectionDetail({
             basePath={eventPagePath}
           />
         </DetailSection>
-        <DetailSection title="Participant Events">
+        <DetailSection id="participant-events" title="Participant Events">
           <EventTable
             title="Join, exit, address-pair, and public-key registration"
             events={lists.participantEvents}
@@ -340,7 +361,7 @@ function SectionDetail({
             basePath={eventPagePath}
           />
         </DetailSection>
-        <DetailSection title="Private-State Public Signal Events">
+        <DetailSection id="private-state-events" title="Private-State Public Signal Events">
           <EventTable
             title="Accepted transitions and storage/accounting signals"
             events={lists.privateStateEvents}
@@ -472,9 +493,9 @@ function ObserverSection({
   );
 }
 
-function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+function DetailSection({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
   return (
-    <section className="detail-section">
+    <section className="detail-section" id={id}>
       <h3>{title}</h3>
       {children}
     </section>
@@ -502,16 +523,20 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function EventCountSummary({ counts }: { counts: [string, string][] }) {
+function EventCountSummary({
+  items,
+}: {
+  items: Array<{ id: string; title: string; count: string }>;
+}) {
   return (
-    <dl className="event-count-summary" aria-label="Event counts">
-      {counts.map(([group, count]) => (
-        <div key={group}>
-          <dt>{eventGroupLabel(group)}</dt>
-          <dd>{count}</dd>
-        </div>
+    <nav className="event-count-summary" aria-label="Event count section links">
+      {items.map((item) => (
+        <a href={`#${item.id}`} key={item.id}>
+          <span>{item.title}</span>
+          <strong>{item.count}</strong>
+        </a>
       ))}
-    </dl>
+    </nav>
   );
 }
 
@@ -718,6 +743,13 @@ function displayedEventCount(counts: Record<string, string>) {
   return Object.entries(counts)
     .filter(([group]) => isEventLogGroup(group))
     .map(([, count]) => count)
+    .reduce((total, value) => total + BigInt(value), 0n)
+    .toString();
+}
+
+function sumNamedEventCounts(counts: Record<string, string>, groups: string[]) {
+  return groups
+    .map((group) => counts[group] ?? "0")
     .reduce((total, value) => total + BigInt(value), 0n)
     .toString();
 }
