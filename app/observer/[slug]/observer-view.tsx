@@ -316,11 +316,7 @@ function SectionDetail({
     return (
       <>
         <DetailSection title="Event Counts">
-          <section className="event-count-grid" aria-label="Event counts">
-            {eventCounts.map(([group, count]) => (
-              <Metric key={group} label={eventGroupLabel(group)} value={count} />
-            ))}
-          </section>
+          <EventCountSummary counts={eventCounts} />
         </DetailSection>
         <DetailSection title="Bridge Events">
           <EventTable
@@ -503,6 +499,19 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function EventCountSummary({ counts }: { counts: [string, string][] }) {
+  return (
+    <dl className="event-count-summary" aria-label="Event counts">
+      {counts.map(([group, count]) => (
+        <div key={group}>
+          <dt>{eventGroupLabel(group)}</dt>
+          <dd>{count}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

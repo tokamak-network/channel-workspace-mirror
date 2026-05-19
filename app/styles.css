@@ -125,22 +125,42 @@ dd {
   margin-bottom: 0;
 }
 
-.event-count-grid {
-  align-self: stretch;
-  display: flex;
-  gap: 12px;
-  justify-self: stretch;
-  margin: 0;
-  width: 100%;
-}
-
-.event-count-grid .metric {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
 .metric {
   padding: 15px;
+}
+
+.event-count-summary {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #d9dde5;
+}
+
+.event-count-summary div {
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.event-count-summary div + div {
+  border-left: 1px solid #e7eaf0;
+}
+
+.event-count-summary dt {
+  color: #5d6675;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.event-count-summary dd {
+  color: #16181d;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 6px 0 0;
 }
 
 .overview-panel {
@@ -492,11 +512,13 @@ td {
   .status-strip,
   .metric-grid,
   .metric-grid.compact,
+  .event-count-summary,
   .summary-list {
     grid-template-columns: 1fr;
   }
 
-  .event-count-grid {
-    flex-direction: column;
+  .event-count-summary div + div {
+    border-left: 0;
+    border-top: 1px solid #e7eaf0;
   }
 }
