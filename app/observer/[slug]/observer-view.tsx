@@ -317,15 +317,15 @@ function SectionDetail({
           </section>
         </DetailSection>
         <DetailSection title="Bridge Events">
-          <EventTable title="Bridge deposits, withdrawals, tolls, and refunds" events={lists.bridgeEvents} displayLimit={50} />
+          <EventTable title="Bridge deposits, withdrawals, tolls, and refunds" events={lists.bridgeEvents} displayLimit={15} />
         </DetailSection>
         <DetailSection title="Participant Events">
-          <EventTable title="Join, exit, address-pair, and public-key registration" events={lists.participantEvents} displayLimit={50} />
+          <EventTable title="Join, exit, address-pair, and public-key registration" events={lists.participantEvents} displayLimit={15} />
         </DetailSection>
         <DetailSection title="Private-State Public Signal Events">
-          <EventTable title="Accepted transitions and storage/accounting signals" events={lists.privateStateEvents} displayLimit={50} />
-          <EventTable title="Commitments and nullifiers" events={lists.commitmentEvents} displayLimit={50} />
-          <EventTable title="Encrypted payloads" events={lists.encryptedPayloadEvents} displayLimit={50} />
+          <EventTable title="Accepted transitions and storage/accounting signals" events={lists.privateStateEvents} displayLimit={15} />
+          <EventTable title="Commitments and nullifiers" events={lists.commitmentEvents} displayLimit={15} />
+          <EventTable title="Encrypted payloads" events={lists.encryptedPayloadEvents} displayLimit={15} />
         </DetailSection>
       </>
     );
