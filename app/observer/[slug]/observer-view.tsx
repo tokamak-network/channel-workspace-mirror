@@ -316,7 +316,7 @@ function SectionDetail({
     return (
       <>
         <DetailSection title="Event Counts">
-          <section className="metric-grid compact" aria-label="Event counts">
+          <section className="event-count-grid" aria-label="Event counts">
             {eventCounts.map(([group, count]) => (
               <Metric key={group} label={eventGroupLabel(group)} value={count} />
             ))}

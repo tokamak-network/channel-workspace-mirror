@@ -125,6 +125,14 @@ dd {
   margin-bottom: 0;
 }
 
+.event-count-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin: 0;
+  width: 100%;
+}
+
 .metric {
   padding: 15px;
 }
@@ -478,6 +486,7 @@ td {
   .status-strip,
   .metric-grid,
   .metric-grid.compact,
+  .event-count-grid,
   .summary-list {
     grid-template-columns: 1fr;
   }
