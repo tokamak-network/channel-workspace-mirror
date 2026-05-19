@@ -54,7 +54,6 @@ type RawHistoryEntry = {
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ERC1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
-const ERC1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 const RAW_RECOVERY_EVENTS = new Set([
   "CurrentRootVectorObserved",
   "StorageKeyObserved",
@@ -249,9 +248,7 @@ async function refreshChannelCurrentState(
     currentChannelManager,
     bridgeOwner,
     bridgeCoreImplementation,
-    bridgeCoreProxyAdmin,
     bridgeTokenVaultImplementation,
-    bridgeTokenVaultProxyAdmin,
   ] = await Promise.all([
     readAddress(client, limiter, bridgeCore, "canonicalAsset"),
     readAddress(client, limiter, bridgeCore, "bridgeTokenVault"),
@@ -260,9 +257,7 @@ async function refreshChannelCurrentState(
     readAddress(client, limiter, bridgeCore, "getChannelManager", [configuredChannelId]),
     readAddress(client, limiter, bridgeCore, "owner"),
     readProxySlotAddress(client, limiter, bridgeCore, ERC1967_IMPLEMENTATION_SLOT),
-    readProxySlotAddress(client, limiter, bridgeCore, ERC1967_ADMIN_SLOT),
     readProxySlotAddress(client, limiter, channel.bridgeTokenVault, ERC1967_IMPLEMENTATION_SLOT),
-    readProxySlotAddress(client, limiter, channel.bridgeTokenVault, ERC1967_ADMIN_SLOT),
   ]);
 
   const [
@@ -322,9 +317,7 @@ async function refreshChannelCurrentState(
       tokamak_verifier_version = ${dAppVerifierSnapshot.tokamakVerifierCompatibleBackendVersion},
       admin_wallet = ${bridgeOwner},
       bridge_core_implementation = ${bridgeCoreImplementation},
-      bridge_core_proxy_admin = ${bridgeCoreProxyAdmin},
       bridge_token_vault_implementation = ${bridgeTokenVaultImplementation},
-      bridge_token_vault_proxy_admin = ${bridgeTokenVaultProxyAdmin},
       current_join_toll = ${currentJoinToll.toString()},
       current_root_vector_hash = ${currentRootVectorHash},
       current_state_refreshed_at = now(),

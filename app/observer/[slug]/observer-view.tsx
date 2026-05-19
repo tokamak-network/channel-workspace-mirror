@@ -349,9 +349,7 @@ function SectionDetail({
           <InfoGrid>
             <InfoItem label="Proxy addresses" value="not indexed" />
             <InfoItem label="BridgeCore implementation" value={channel.bridge_core_implementation ?? "not indexed"} mono />
-            <InfoItem label="BridgeCore proxy admin" value={channel.bridge_core_proxy_admin ?? "not indexed"} mono />
             <InfoItem label="BridgeTokenVault implementation" value={channel.bridge_token_vault_implementation ?? "not indexed"} mono />
-            <InfoItem label="BridgeTokenVault proxy admin" value={channel.bridge_token_vault_proxy_admin ?? "not indexed"} mono />
             <InfoItem label="Owner / admin wallet" value={channel.admin_wallet ?? "unknown"} mono />
             <InfoItem label="Multisig / timelock" value="not indexed" />
             <InfoItem label="Channel leader" value={channel.leader ?? "unknown"} mono />
