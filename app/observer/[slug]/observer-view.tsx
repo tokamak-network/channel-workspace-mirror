@@ -4,6 +4,15 @@ import type { ObserverDashboard, ObserverEventRow } from "@/lib/observer/queries
 
 type SectionId = "channel" | "bridge" | "participants" | "events" | "upgrades" | "notices";
 type ObserverSearchParams = Record<string, string | string[] | undefined>;
+type ObserverChannel = ObserverDashboard["channel"];
+type ExternalLinkItem = {
+  label: string;
+  value: string | null;
+};
+
+const TOKAMAK_DOCS_INDEX_URL = "https://github.com/tokamak-network/Tokamak-zk-EVM-contracts/blob/main/docs/index.md";
+const PRIVATE_STATE_CLI_NPM_URL = "https://www.npmjs.com/package/@tokamak-private-dapps/private-state-cli";
+const PRIVATE_STATE_CLI_LATEST_VERSION = "2.2.1";
 
 type ObserverSectionDefinition = {
   id: SectionId;
@@ -242,10 +251,10 @@ function SectionDetail({
           <InfoGrid>
             <InfoItem label="Deployment source" value={<ExternalValue value={channel.source_code_url} />} />
             <InfoItem label="ABI / deployment artifacts" value={<ExternalValue value={channel.abi_url} />} />
-            <InfoItem label="Source verification" value="not indexed" />
-            <InfoItem label="Bytecode hash" value="not indexed" />
-            <InfoItem label="Deployed Git commit" value="not indexed" />
-            <InfoItem label="NPM package version" value="not indexed" />
+            <InfoItem label="Source verification" value={<ExternalLinks links={sourceVerificationLinks(channel)} />} />
+            <InfoItem label="Bytecode hash" value={<ExternalLinks links={bytecodeReferenceLinks(channel)} />} />
+            <InfoItem label="Deployed Git commit" value={<ExternalLinks links={deploymentCommitArtifactLinks(channel)} />} />
+            <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
           </InfoGrid>
         </DetailSection>
       </>
@@ -429,9 +438,9 @@ function SectionDetail({
           <InfoGrid>
             <InfoItem label="Deployment block" value={channel.genesis_block} mono />
             <InfoItem label="Current state refreshed" value={formatDate(channel.current_state_refreshed_at)} />
-            <InfoItem label="Deployed Git commit" value="not indexed" />
-            <InfoItem label="NPM package version" value="not indexed" />
-            <InfoItem label="Source verification" value="not indexed" />
+            <InfoItem label="Deployed Git commit" value={<ExternalLinks links={deploymentCommitArtifactLinks(channel)} />} />
+            <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
+            <InfoItem label="Source verification" value={<ExternalLinks links={sourceVerificationLinks(channel)} />} />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Policy Events">
@@ -473,8 +482,8 @@ function SectionDetail({
         <InfoGrid>
           <InfoItem label="Deployment source" value={<ExternalValue value={channel.source_code_url} />} />
           <InfoItem label="ABI / deployment artifacts" value={<ExternalValue value={channel.abi_url} />} />
-          <InfoItem label="Explorer links" value="not indexed" />
-          <InfoItem label="Monitoring packet / policy docs" value="not indexed" />
+          <InfoItem label="Explorer links" value={<ExternalLinks links={explorerLinks(channel)} />} />
+          <InfoItem label="Monitoring packet / policy docs" value={<ExternalLinks links={monitoringPolicyLinks()} />} />
         </InfoGrid>
       </DetailSection>
     </>
@@ -690,6 +699,138 @@ function ExternalValue({ value }: { value: string | null }) {
       {value}
     </a>
   );
+}
+
+function ExternalLinks({ links }: { links: ExternalLinkItem[] }) {
+  const availableLinks = links.filter((link): link is { label: string; value: string } => Boolean(link.value));
+  if (availableLinks.length === 0) {
+    return "unavailable";
+  }
+  return (
+    <span className="external-link-list">
+      {availableLinks.map((link) => (
+        <a href={link.value} key={`${link.label}-${link.value}`} rel="noreferrer" target="_blank">
+          {link.label}
+        </a>
+      ))}
+    </span>
+  );
+}
+
+function NpmPackageVersion() {
+  return (
+    <a href={PRIVATE_STATE_CLI_NPM_URL} rel="noreferrer" target="_blank">
+      @tokamak-private-dapps/private-state-cli {PRIVATE_STATE_CLI_LATEST_VERSION}
+    </a>
+  );
+}
+
+function sourceVerificationLinks(channel: ObserverChannel): ExternalLinkItem[] {
+  return contractCodeLinks(channel).map((link) => ({
+    label: `${link.label} source`,
+    value: link.value,
+  }));
+}
+
+function bytecodeReferenceLinks(channel: ObserverChannel): ExternalLinkItem[] {
+  return contractCodeLinks(channel).map((link) => ({
+    label: `${link.label} bytecode`,
+    value: link.value,
+  }));
+}
+
+function explorerLinks(channel: ObserverChannel): ExternalLinkItem[] {
+  return [
+    ...contractAddressLinks(channel),
+    {
+      label: "Channel registration tx",
+      value: etherscanTxUrl(channel, channel.channel_registration_tx),
+    },
+  ];
+}
+
+function deploymentCommitArtifactLinks(channel: ObserverChannel): ExternalLinkItem[] {
+  return [
+    {
+      label: "bridge.1.json",
+      value: channel.abi_url,
+    },
+    {
+      label: "deployment.1.latest.json",
+      value: channel.abi_url,
+    },
+  ];
+}
+
+function monitoringPolicyLinks(): ExternalLinkItem[] {
+  return [
+    {
+      label: "Official docs index",
+      value: TOKAMAK_DOCS_INDEX_URL,
+    },
+  ];
+}
+
+function contractCodeLinks(channel: ObserverChannel): ExternalLinkItem[] {
+  return contractAddressLinks(channel).map((link) => ({
+    label: link.label,
+    value: link.value ? `${link.value}#code` : null,
+  }));
+}
+
+function contractAddressLinks(channel: ObserverChannel): ExternalLinkItem[] {
+  return [
+    {
+      label: "BridgeCore",
+      value: etherscanAddressUrl(channel, channel.bridge_core),
+    },
+    {
+      label: "BridgeTokenVault",
+      value: etherscanAddressUrl(channel, channel.bridge_token_vault),
+    },
+    {
+      label: "ChannelManager",
+      value: etherscanAddressUrl(channel, channel.channel_manager),
+    },
+    {
+      label: "DAppManager",
+      value: etherscanAddressUrl(channel, channel.dapp_manager),
+    },
+    {
+      label: "Controller",
+      value: etherscanAddressUrl(channel, channel.controller),
+    },
+    {
+      label: "L2AccountingVault",
+      value: etherscanAddressUrl(channel, channel.l2_accounting_vault),
+    },
+    {
+      label: "Groth16 verifier",
+      value: etherscanAddressUrl(channel, channel.groth_verifier),
+    },
+    {
+      label: "Tokamak verifier",
+      value: etherscanAddressUrl(channel, channel.tokamak_verifier),
+    },
+  ];
+}
+
+function etherscanAddressUrl(channel: ObserverChannel, address: string | null) {
+  if (!address) {
+    return null;
+  }
+  return `${etherscanBaseUrl(channel)}/address/${address}`;
+}
+
+function etherscanTxUrl(channel: ObserverChannel, txHash: string | null) {
+  if (!txHash) {
+    return null;
+  }
+  return `${etherscanBaseUrl(channel)}/tx/${txHash}`;
+}
+
+function etherscanBaseUrl(channel: ObserverChannel) {
+  return channel.chain_id === "11155111" ? "https://sepolia.etherscan.io" : "https://etherscan.io";
 }
 
 function formatDate(value: string | null) {

@@ -357,6 +357,16 @@ dd {
   line-height: 1.45;
 }
 
+.external-link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.external-link-list a {
+  white-space: nowrap;
+}
+
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
