@@ -9,7 +9,6 @@ type ObserverSectionDefinition = {
   label: string;
   title: string;
   summary: string;
-  audience: string;
 };
 
 export const observerSections: ObserverSectionDefinition[] = [
@@ -18,49 +17,42 @@ export const observerSections: ObserverSectionDefinition[] = [
     label: "Funds",
     title: "Bridge Funds",
     summary: "Deposits, withdrawals, canonical asset, and vault addresses.",
-    audience: "Users",
   },
   {
     id: "participants",
     label: "Participants",
     title: "Participant Registry",
     summary: "Active members and public identity registration records.",
-    audience: "Users / Operators",
   },
   {
     id: "privacy",
     label: "Privacy",
     title: "Privacy Signals",
     summary: "Commitments, nullifiers, and encrypted note payloads.",
-    audience: "Reviewers",
   },
   {
     id: "rules",
     label: "Rules",
     title: "Channel Rules",
     summary: "Managers, controllers, accounting vaults, and metadata roots.",
-    audience: "Operators / Reviewers",
   },
   {
     id: "verification",
     label: "Verification",
     title: "Proof Verification",
     summary: "Verifier contracts, versions, and upgrade history.",
-    audience: "Reviewers",
   },
   {
     id: "notices",
     label: "Notices",
     title: "Governance Notices",
     summary: "Admin wallet, incident status, source references, and ABI links.",
-    audience: "Everyone",
   },
   {
     id: "audit",
     label: "Audit",
     title: "Public Event Log",
     summary: "Indexed event counts and recent public records.",
-    audience: "Reviewers",
   },
 ];
 
@@ -99,17 +91,6 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
         <Metric label="Bridge withdrawals" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
         <Metric label="Active participants" value={stats.channelParticipantsCount} />
         <Metric label="Indexed events" value={totalEvents} />
-      </section>
-
-      <section className="section-index" aria-label="Observer sections">
-        {observerSections.map((section) => (
-          <Link className="section-card" href={`/observer/${channel.slug}/${section.id}`} key={section.id}>
-            <span>{section.label}</span>
-            <strong>{section.title}</strong>
-            <small>{section.summary}</small>
-            <em>{section.audience}</em>
-          </Link>
-        ))}
       </section>
 
       <section className="overview-grid" aria-label="Key public records">

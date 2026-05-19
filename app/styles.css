@@ -166,55 +166,6 @@ dd {
   padding: 0;
 }
 
-.section-index {
-  max-width: none;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0 26px;
-}
-
-.section-card {
-  display: grid;
-  gap: 7px;
-  min-height: 136px;
-  padding: 15px;
-  border: 1px solid #d9dde5;
-  border-radius: 8px;
-  background: #ffffff;
-  color: inherit;
-  text-decoration: none;
-}
-
-.section-card:hover {
-  border-color: #8390a3;
-}
-
-.section-card span,
-.section-card em {
-  color: #5d6675;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.section-card strong {
-  font-size: 17px;
-  line-height: 1.25;
-}
-
-.section-card small {
-  color: #3f4754;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.section-card em {
-  align-self: end;
-  color: #8a4b0f;
-}
-
 .overview-grid {
   max-width: none;
   display: grid;
@@ -461,7 +412,6 @@ td:nth-child(3) {
   .status-strip,
   .metric-grid,
   .metric-grid.compact,
-  .section-index,
   .summary-list {
     grid-template-columns: 1fr;
   }
