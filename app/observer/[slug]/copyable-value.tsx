@@ -5,12 +5,10 @@ import { useState } from "react";
 export function CopyableValue({
   className,
   displayValue,
-  href,
   value,
 }: {
   className?: string;
   displayValue: string;
-  href?: string;
   value: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -28,23 +26,19 @@ export function CopyableValue({
     }
   }
 
-  const label = failed ? "Failed" : copied ? "Copied" : "Copy";
-  const valueElement = href ? (
-    <a className="copyable-text" href={href} rel="noreferrer" target="_blank" title={value}>
-      {displayValue}
-    </a>
-  ) : (
-    <span className="copyable-text" title={value}>
-      {displayValue}
-    </span>
-  );
+  const status = failed ? "Copy failed" : copied ? "Copied" : value;
 
   return (
-    <span className={className ? `copyable-value ${className}` : "copyable-value"}>
-      {valueElement}
-      <button aria-label={`Copy ${value}`} className="copy-button" onClick={copyValue} type="button">
-        {label}
-      </button>
-    </span>
+    <button
+      aria-label={`Copy ${value}`}
+      className={className ? `copyable-value ${className}` : "copyable-value"}
+      onClick={copyValue}
+      type="button"
+    >
+      <span className="copyable-text" title={value}>
+        {displayValue}
+      </span>
+      <span className={copied || failed ? "copy-tooltip copy-tooltip-status" : "copy-tooltip"}>{status}</span>
+    </button>
   );
 }

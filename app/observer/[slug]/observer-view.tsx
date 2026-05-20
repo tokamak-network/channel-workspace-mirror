@@ -209,7 +209,6 @@ function SectionDetail({
   const { channel, stats, lists } = dashboard;
   const verifierVersion = `Tokamak ${channel.tokamak_verifier_version ?? "unknown"} / Groth16 ${channel.groth_verifier_version ?? "unknown"}`;
   const eventPagePath = `/observer/${channel.slug}/events`;
-  const explorerBaseUrl = etherscanBaseUrl(channel);
 
   if (sectionId === "channel") {
     return (
@@ -377,7 +376,6 @@ function SectionDetail({
             pageParam="bridgePage"
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
         </DetailSection>
         <DetailSection id="participant-events" title="Participant Events">
@@ -391,7 +389,6 @@ function SectionDetail({
             decodedFields={["joinedAt", "leafIndex", "joinTollPaid"]}
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
           <EventTable
             id="participant-address-pair-event-list"
@@ -403,7 +400,6 @@ function SectionDetail({
             decodedFields={["l1Address", "l2Address", "channelTokenVaultKey"]}
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
           <EventTable
             id="participant-public-key-event-list"
@@ -415,7 +411,6 @@ function SectionDetail({
             decodedFields={["l1Address", "noteReceivePubKeyX", "noteReceivePubKeyYParity"]}
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
           <EventTable
             id="participant-exit-event-list"
@@ -427,7 +422,6 @@ function SectionDetail({
             decodedFields={["l1Address", "leafIndex"]}
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
         </DetailSection>
         <DetailSection id="private-state-events" title="Private-State Public Signal Events">
@@ -440,7 +434,6 @@ function SectionDetail({
             pageParam="privateStatePage"
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
           <EventTable
             id="commitment-event-list"
@@ -451,7 +444,6 @@ function SectionDetail({
             pageParam="commitmentsPage"
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
           <EventTable
             id="encrypted-payload-event-list"
@@ -462,7 +454,6 @@ function SectionDetail({
             pageParam="encryptedPayloadsPage"
             searchParams={searchParams}
             basePath={eventPagePath}
-            explorerBaseUrl={explorerBaseUrl}
           />
         </DetailSection>
       </>
@@ -500,14 +491,14 @@ function SectionDetail({
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Policy Events">
-          <EventTable title="Policy and metadata changes" events={lists.policyEvents} displayLimit={50} explorerBaseUrl={explorerBaseUrl} />
+          <EventTable title="Policy and metadata changes" events={lists.policyEvents} displayLimit={50} />
         </DetailSection>
         <DetailSection title="Verification Events">
-          <EventTable title="Verifier updates" events={lists.verifierEvents} displayLimit={50} explorerBaseUrl={explorerBaseUrl} />
+          <EventTable title="Verifier updates" events={lists.verifierEvents} displayLimit={50} />
         </DetailSection>
         <DetailSection title="Admin / Upgrade Events">
-          <EventTable title="Proxy upgrades and implementation changes" events={lists.upgradeEvents} displayLimit={50} explorerBaseUrl={explorerBaseUrl} />
-          <EventTable title="Ownership and admin records" events={lists.adminEvents} displayLimit={50} explorerBaseUrl={explorerBaseUrl} />
+          <EventTable title="Proxy upgrades and implementation changes" events={lists.upgradeEvents} displayLimit={50} />
+          <EventTable title="Ownership and admin records" events={lists.adminEvents} displayLimit={50} />
         </DetailSection>
       </>
     );
@@ -684,7 +675,6 @@ function EventTable({
   searchParams,
   basePath,
   decodedFields,
-  explorerBaseUrl,
 }: {
   id?: string;
   title: string;
@@ -695,7 +685,6 @@ function EventTable({
   searchParams?: ObserverSearchParams;
   basePath?: string;
   decodedFields?: string[];
-  explorerBaseUrl?: string;
 }) {
   const eventCount = Number.parseInt(totalCount ?? String(events.length), 10);
   const requestedPage = pageParam ? parsePageNumber(searchParams?.[pageParam]) : 1;
@@ -743,7 +732,6 @@ function EventTable({
                   <td className="mono">
                     <CopyableValue
                       displayValue={shortHash(event.transaction_hash)}
-                      href={explorerBaseUrl ? `${explorerBaseUrl}/tx/${event.transaction_hash}` : undefined}
                       value={event.transaction_hash}
                     />
                   </td>

@@ -541,41 +541,59 @@ td {
 
 .copyable-value {
   align-items: center;
-  display: inline-flex;
-  gap: 6px;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-block;
+  font: inherit;
   max-width: 100%;
   min-width: 0;
+  padding: 0;
+  position: relative;
+  text-align: left;
 }
 
 .copyable-text {
-  color: inherit;
+  border-bottom: 1px dotted #9aa3b2;
+  color: #0b5cab;
   min-width: 0;
   overflow-wrap: anywhere;
-  text-decoration: none;
 }
 
-a.copyable-text {
-  color: #0b5cab;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.copy-button {
-  background: #ffffff;
-  border: 1px solid #cfd6e1;
-  color: #344054;
-  cursor: pointer;
-  flex: 0 0 auto;
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 4px 5px;
-}
-
-.copy-button:hover {
-  border-color: #2f7d69;
+.copyable-value:hover .copyable-text,
+.copyable-value:focus-visible .copyable-text {
+  border-bottom-color: #2f7d69;
   color: #174f42;
+}
+
+.copy-tooltip {
+  background: #16181d;
+  color: #ffffff;
+  display: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  left: 0;
+  line-height: 1.35;
+  max-width: min(560px, 80vw);
+  overflow-wrap: anywhere;
+  padding: 7px 8px;
+  position: absolute;
+  top: calc(100% + 6px);
+  white-space: normal;
+  width: max-content;
+  z-index: 20;
+}
+
+.copy-tooltip-status {
+  font-family: inherit;
+  max-width: 160px;
+}
+
+.copyable-value:hover .copy-tooltip,
+.copyable-value:focus-visible .copy-tooltip {
+  display: block;
 }
 
 .event-name {
