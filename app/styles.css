@@ -539,6 +539,45 @@ td {
   width: 180px;
 }
 
+.copyable-value {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.copyable-text {
+  color: inherit;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+a.copyable-text {
+  color: #0b5cab;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.copy-button {
+  background: #ffffff;
+  border: 1px solid #cfd6e1;
+  color: #344054;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 5px;
+}
+
+.copy-button:hover {
+  border-color: #2f7d69;
+  color: #174f42;
+}
+
 .event-name {
   display: block;
   font-weight: 700;
