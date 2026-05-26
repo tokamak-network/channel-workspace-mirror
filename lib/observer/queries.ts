@@ -79,6 +79,8 @@ export type ObserverEventListPage = {
 };
 
 export type ObserverDashboardOptions = {
+  listMode?: "all" | "events" | "upgrades" | "none";
+  includeIncidents?: boolean | "active";
   eventListPages?: Partial<Record<ObserverEventListName, ObserverEventListPage>>;
 };
 
@@ -122,22 +124,53 @@ export type ObserverDashboard = {
   listTotals: Record<ObserverEventListName, string>;
 };
 
+const EMPTY_LIST_TOTALS: Record<ObserverEventListName, string> = {
+  bridgeEvents: "0",
+  participantJoinEvents: "0",
+  participantAddressPairEvents: "0",
+  participantPublicKeyEvents: "0",
+  participantExitEvents: "0",
+  commitmentEvents: "0",
+  encryptedPayloadEvents: "0",
+  privateStateEvents: "0",
+};
+
+const DECODED_FIELDS = {
+  bridge: ["user", "channelId", "amount", "refundBps"],
+  channelCreated: ["channelId", "dappId", "manager", "bridgeTokenVault"],
+  transition: ["rootVectorHash"],
+  participantJoin: ["l1Address", "l2Address", "channelTokenVaultKey", "leafIndex", "joinTollPaid", "joinedAt", "noteReceivePubKeyX", "noteReceivePubKeyYParity"],
+  participantExit: ["l1Address", "leafIndex"],
+  commitment: ["storageKey"],
+  encryptedPayload: ["encryptedNoteValue"],
+  privateState: ["rootVectorHash", "storageAddr", "storageKey", "value", "l2Address"],
+  policy: ["previousJoinToll", "newJoinToll"],
+  verifier: ["grothVerifier", "tokamakVerifier"],
+  admin: ["previousOwner", "newOwner"],
+  upgrade: ["implementation"],
+  api: ["user", "channelId", "amount", "refundBps", "l1Address", "l2Address", "channelTokenVaultKey", "leafIndex", "joinedAt", "rootVectorHash", "storageKey", "encryptedNoteValue", "implementation"],
+} as const;
+
+type EventQueryFilters = {
+  eventGroup?: string;
+  eventName?: string;
+  excludedGroups?: string[];
+  decodedFields?: readonly string[];
+  limit?: number;
+  offset?: number;
+  sort?: "asc" | "desc";
+};
+
 export async function getObserverDashboard(
   slug: string,
   options: ObserverDashboardOptions = {},
 ): Promise<ObserverDashboard | null> {
-  const sql = getSql();
-  const channels = await sql`
-    select *
-    from observer_channels
-    where slug = ${slug}
-    limit 1
-  ` as ObserverChannelRow[];
-  const channel = channels[0];
+  const channel = await getObserverChannel(slug);
   if (!channel) {
     return null;
   }
 
+  const sql = getSql();
   const [syncRows, channelCreatedRows, latestTransitions, totals, participantRows, countRows] = await Promise.all([
     sql`
       select last_scanned_block, latest_block, updated_at
@@ -146,8 +179,8 @@ export async function getObserverDashboard(
         and channel_id = ${channel.channel_id}
       limit 1
     ` as unknown as Promise<{ last_scanned_block: string; latest_block: string | null; updated_at: string }[]>,
-    eventRows(channel, { eventName: "ChannelCreated", limit: 1, sort: "asc" }),
-    eventRows(channel, { eventName: "CurrentRootVectorObserved", limit: 1 }),
+    eventRows(channel, { eventName: "ChannelCreated", decodedFields: DECODED_FIELDS.channelCreated, limit: 1, sort: "asc" }),
+    eventRows(channel, { eventName: "CurrentRootVectorObserved", decodedFields: DECODED_FIELDS.transition, limit: 1 }),
     sql`
       select
         coalesce(sum(case when event_name = 'AssetsFunded' then (decoded->>'amount')::numeric else 0 end), 0)::text as deposits,
@@ -191,39 +224,73 @@ export async function getObserverDashboard(
     ` as unknown as Promise<{ event_group: string; count: string }[]>,
   ]);
 
-  const [
-    bridgeList,
-    participantJoinList,
-    participantAddressPairList,
-    participantPublicKeyList,
-    participantExitList,
-    storageList,
-    encryptedPayloadList,
-    privateStateList,
-    policyEvents,
-    transitionEvents,
-    verifierEvents,
-    adminEvents,
-    upgradeEvents,
-    activeIncidents,
-    incidentHistory,
-  ] = await Promise.all([
-    eventListByGroups(channel, ["deposit", "withdrawal"], pageFor(options, "bridgeEvents")),
-    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", ...pageFor(options, "participantJoinEvents") }),
-    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", ...pageFor(options, "participantAddressPairEvents") }),
-    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", ...pageFor(options, "participantPublicKeyEvents") }),
-    eventListRows(channel, { eventName: "ChannelTokenVaultIdentityExited", ...pageFor(options, "participantExitEvents") }),
-    eventListRows(channel, { eventName: "StorageKeyObserved", ...pageFor(options, "commitmentEvents") }),
-    eventListRows(channel, { eventName: "NoteValueEncrypted", ...pageFor(options, "encryptedPayloadEvents") }),
-    eventListByGroups(channel, ["transition", "l2_accounting"], pageFor(options, "privateStateEvents")),
-    eventRows(channel, { eventGroup: "policy", limit: 100 }),
-    eventRows(channel, { eventGroup: "transition", limit: 100 }),
-    eventRows(channel, { eventGroup: "verifier", limit: 100 }),
-    eventRows(channel, { eventGroup: "admin", limit: 100 }),
-    eventRows(channel, { eventGroup: "upgrade", limit: 100 }),
-    incidentRows(channel, { activeOnly: true, limit: 20 }),
-    incidentRows(channel, { limit: 100 }),
-  ]);
+  const listMode = options.listMode ?? "all";
+  const lists = emptyEventLists();
+  const listTotals = { ...EMPTY_LIST_TOTALS };
+
+  if (listMode === "all" || listMode === "events") {
+    const [
+      bridgeList,
+      participantJoinList,
+      participantAddressPairList,
+      participantPublicKeyList,
+      participantExitList,
+      storageList,
+      encryptedPayloadList,
+      privateStateList,
+    ] = await Promise.all([
+      eventListByGroups(channel, ["deposit", "withdrawal"], pageFor(options, "bridgeEvents"), DECODED_FIELDS.bridge),
+      eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", decodedFields: DECODED_FIELDS.participantJoin, ...pageFor(options, "participantJoinEvents") }),
+      eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", decodedFields: DECODED_FIELDS.participantJoin, ...pageFor(options, "participantAddressPairEvents") }),
+      eventListRows(channel, { eventName: "ChannelTokenVaultIdentityRegistered", decodedFields: DECODED_FIELDS.participantJoin, ...pageFor(options, "participantPublicKeyEvents") }),
+      eventListRows(channel, { eventName: "ChannelTokenVaultIdentityExited", decodedFields: DECODED_FIELDS.participantExit, ...pageFor(options, "participantExitEvents") }),
+      eventListRows(channel, { eventName: "StorageKeyObserved", decodedFields: DECODED_FIELDS.commitment, ...pageFor(options, "commitmentEvents") }),
+      eventListRows(channel, { eventName: "NoteValueEncrypted", decodedFields: DECODED_FIELDS.encryptedPayload, ...pageFor(options, "encryptedPayloadEvents") }),
+      eventListByGroups(channel, ["transition", "l2_accounting"], pageFor(options, "privateStateEvents"), DECODED_FIELDS.privateState),
+    ]);
+
+    lists.bridgeEvents = bridgeList.rows;
+    lists.participantJoinEvents = participantJoinList.rows;
+    lists.participantAddressPairEvents = participantAddressPairList.rows;
+    lists.participantPublicKeyEvents = participantPublicKeyList.rows;
+    lists.participantExitEvents = participantExitList.rows;
+    lists.commitmentEvents = storageList.rows;
+    lists.nullifierEvents = storageList.rows;
+    lists.encryptedPayloadEvents = encryptedPayloadList.rows;
+    lists.privateStateEvents = privateStateList.rows;
+
+    listTotals.bridgeEvents = bridgeList.totalCount;
+    listTotals.participantJoinEvents = participantJoinList.totalCount;
+    listTotals.participantAddressPairEvents = participantAddressPairList.totalCount;
+    listTotals.participantPublicKeyEvents = participantPublicKeyList.totalCount;
+    listTotals.participantExitEvents = participantExitList.totalCount;
+    listTotals.commitmentEvents = storageList.totalCount;
+    listTotals.encryptedPayloadEvents = encryptedPayloadList.totalCount;
+    listTotals.privateStateEvents = privateStateList.totalCount;
+  }
+
+  if (listMode === "all" || listMode === "upgrades") {
+    const [policyEvents, transitionEvents, verifierEvents, adminEvents, upgradeEvents] = await Promise.all([
+      eventRows(channel, { eventGroup: "policy", decodedFields: DECODED_FIELDS.policy, limit: 100 }),
+      eventRows(channel, { eventGroup: "transition", decodedFields: DECODED_FIELDS.transition, limit: 100 }),
+      eventRows(channel, { eventGroup: "verifier", decodedFields: DECODED_FIELDS.verifier, limit: 100 }),
+      eventRows(channel, { eventGroup: "admin", decodedFields: DECODED_FIELDS.admin, limit: 100 }),
+      eventRows(channel, { eventGroup: "upgrade", decodedFields: DECODED_FIELDS.upgrade, limit: 100 }),
+    ]);
+    lists.policyEvents = policyEvents;
+    lists.transitionEvents = transitionEvents;
+    lists.verifierEvents = verifierEvents;
+    lists.adminEvents = adminEvents;
+    lists.upgradeEvents = upgradeEvents;
+  }
+
+  const includeIncidents = options.includeIncidents ?? true;
+  const [activeIncidents, incidentHistory] = includeIncidents
+    ? await Promise.all([
+      incidentRows(channel, { activeOnly: true, limit: 20 }),
+      includeIncidents === "active" ? Promise.resolve([]) : incidentRows(channel, { limit: 100 }),
+    ])
+    : [[], []];
 
   const eventCounts: Record<string, string> = {};
   for (const row of countRows) {
@@ -247,59 +314,45 @@ export async function getObserverDashboard(
       exitedParticipantsCount: participantRows[0]?.exited_count ?? "0",
       eventCounts,
     },
-    lists: {
-      bridgeEvents: bridgeList.rows,
-      participantJoinEvents: participantJoinList.rows,
-      participantAddressPairEvents: participantAddressPairList.rows,
-      participantPublicKeyEvents: participantPublicKeyList.rows,
-      participantExitEvents: participantExitList.rows,
-      commitmentEvents: storageList.rows,
-      nullifierEvents: storageList.rows,
-      encryptedPayloadEvents: encryptedPayloadList.rows,
-      privateStateEvents: privateStateList.rows,
-      policyEvents,
-      transitionEvents,
-      verifierEvents,
-      adminEvents,
-      upgradeEvents,
-    },
+    lists,
     incidents: {
       active: activeIncidents,
       history: incidentHistory,
     },
-    listTotals: {
-      bridgeEvents: bridgeList.totalCount,
-      participantJoinEvents: participantJoinList.totalCount,
-      participantAddressPairEvents: participantAddressPairList.totalCount,
-      participantPublicKeyEvents: participantPublicKeyList.totalCount,
-      participantExitEvents: participantExitList.totalCount,
-      commitmentEvents: storageList.totalCount,
-      encryptedPayloadEvents: encryptedPayloadList.totalCount,
-      privateStateEvents: privateStateList.totalCount,
-    },
+    listTotals,
   };
 }
 
 export async function getObserverEvents(slug: string, filters: { group?: string; event?: string; limit?: number }) {
-  const dashboard = await getObserverDashboard(slug);
-  if (!dashboard) {
+  const channel = await getObserverChannel(slug);
+  if (!channel) {
     return null;
   }
-  return eventRows(dashboard.channel, {
+  return eventRows(channel, {
     eventGroup: filters.group,
     eventName: filters.event,
+    decodedFields: decodedFieldsForEventFilters(filters),
     limit: filters.limit ?? 100,
   });
 }
 
-async function eventRows(
-  channel: ObserverChannelRow,
-  filters: { eventGroup?: string; eventName?: string; excludedGroups?: string[]; limit?: number; offset?: number; sort?: "asc" | "desc" },
-) {
+async function getObserverChannel(slug: string) {
+  const sql = getSql();
+  const channels = await sql`
+    select *
+    from observer_channels
+    where slug = ${slug}
+    limit 1
+  ` as ObserverChannelRow[];
+  return channels[0] ?? null;
+}
+
+async function eventRows(channel: ObserverChannelRow, filters: EventQueryFilters) {
   const sql = getSql();
   const limit = Math.min(Math.max(filters.limit ?? 100, 1), 500);
   const offset = Math.max(filters.offset ?? 0, 0);
   const excludedGroups = filters.excludedGroups ?? [];
+  const decodedFields = filters.decodedFields ?? DECODED_FIELDS.api;
   const rows = await sql`
     select
       id::text,
@@ -310,10 +363,16 @@ async function eventRows(
       contract_address,
       event_name,
       event_group,
-      decoded
-    from observer_events
-    where chain_id = ${channel.chain_id}::bigint
-      and channel_id = ${channel.channel_id}
+      (
+        select coalesce(
+          jsonb_object_agg(decoded_key, e.decoded -> decoded_key) filter (where e.decoded ? decoded_key),
+          '{}'::jsonb
+        )
+        from unnest(${decodedFields}::text[]) as decoded_key
+      ) as decoded
+    from observer_events e
+    where e.chain_id = ${channel.chain_id}::bigint
+      and e.channel_id = ${channel.channel_id}
       and (${filters.eventGroup ?? null}::text is null or event_group = ${filters.eventGroup ?? null})
       and (${filters.eventName ?? null}::text is null or event_name = ${filters.eventName ?? null})
       and (cardinality(${excludedGroups}::text[]) = 0 or event_group <> all(${excludedGroups}::text[]))
@@ -330,7 +389,7 @@ async function eventRows(
 
 async function eventListRows(
   channel: ObserverChannelRow,
-  filters: { eventGroup?: string; eventName?: string; excludedGroups?: string[]; limit: number; offset: number; sort?: "asc" | "desc" },
+  filters: EventQueryFilters & { limit: number; offset: number },
 ) {
   const [rows, totalCount] = await Promise.all([
     eventRows(channel, filters),
@@ -343,6 +402,7 @@ async function eventListByGroups(
   channel: ObserverChannelRow,
   eventGroups: string[],
   page: ObserverEventListPage,
+  decodedFields: readonly string[],
 ) {
   const sql = getSql();
   const limit = Math.min(Math.max(page.limit, 1), 500);
@@ -358,11 +418,17 @@ async function eventListByGroups(
         contract_address,
         event_name,
         event_group,
-        decoded
-      from observer_events
-      where chain_id = ${channel.chain_id}::bigint
-        and channel_id = ${channel.channel_id}
-        and event_group = any(${eventGroups}::text[])
+        (
+          select coalesce(
+            jsonb_object_agg(decoded_key, e.decoded -> decoded_key) filter (where e.decoded ? decoded_key),
+            '{}'::jsonb
+          )
+          from unnest(${decodedFields}::text[]) as decoded_key
+        ) as decoded
+      from observer_events e
+      where e.chain_id = ${channel.chain_id}::bigint
+        and e.channel_id = ${channel.channel_id}
+        and e.event_group = any(${eventGroups}::text[])
       order by block_number desc, log_index desc
       limit ${String(limit)}::integer
       offset ${String(offset)}::integer
@@ -428,4 +494,57 @@ async function incidentRows(
 
 function pageFor(options: ObserverDashboardOptions, listName: ObserverEventListName): ObserverEventListPage {
   return options.eventListPages?.[listName] ?? { limit: 100, offset: 0 };
+}
+
+function emptyEventLists(): ObserverDashboard["lists"] {
+  return {
+    bridgeEvents: [],
+    participantJoinEvents: [],
+    participantAddressPairEvents: [],
+    participantPublicKeyEvents: [],
+    participantExitEvents: [],
+    commitmentEvents: [],
+    nullifierEvents: [],
+    encryptedPayloadEvents: [],
+    privateStateEvents: [],
+    policyEvents: [],
+    transitionEvents: [],
+    verifierEvents: [],
+    adminEvents: [],
+    upgradeEvents: [],
+  };
+}
+
+function decodedFieldsForEventFilters(filters: { group?: string; event?: string }) {
+  if (filters.event === "ChannelTokenVaultIdentityRegistered") {
+    return DECODED_FIELDS.participantJoin;
+  }
+  if (filters.event === "ChannelTokenVaultIdentityExited") {
+    return DECODED_FIELDS.participantExit;
+  }
+  if (filters.event === "StorageKeyObserved") {
+    return DECODED_FIELDS.commitment;
+  }
+  if (filters.event === "NoteValueEncrypted") {
+    return DECODED_FIELDS.encryptedPayload;
+  }
+  if (filters.event === "CurrentRootVectorObserved" || filters.group === "transition") {
+    return DECODED_FIELDS.transition;
+  }
+  if (filters.group === "deposit" || filters.group === "withdrawal") {
+    return DECODED_FIELDS.bridge;
+  }
+  if (filters.group === "policy") {
+    return DECODED_FIELDS.policy;
+  }
+  if (filters.group === "verifier") {
+    return DECODED_FIELDS.verifier;
+  }
+  if (filters.group === "admin") {
+    return DECODED_FIELDS.admin;
+  }
+  if (filters.group === "upgrade") {
+    return DECODED_FIELDS.upgrade;
+  }
+  return DECODED_FIELDS.api;
 }

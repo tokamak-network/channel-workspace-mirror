@@ -4,7 +4,10 @@ import { ObserverOverview } from "./observer-view";
 
 export default async function ObserverChannelPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const dashboard = await getObserverDashboard(slug);
+  const dashboard = await getObserverDashboard(slug, {
+    includeIncidents: "active",
+    listMode: "none",
+  });
   if (!dashboard) {
     notFound();
   }

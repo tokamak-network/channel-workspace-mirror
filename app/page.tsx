@@ -11,7 +11,10 @@ export default async function Home() {
   const host = requestHeaders.get("host")?.split(":")[0];
 
   if (host === OBSERVER_HOST) {
-    const dashboard = await getObserverDashboard(OBSERVER_CHANNEL_SLUG);
+    const dashboard = await getObserverDashboard(OBSERVER_CHANNEL_SLUG, {
+      includeIncidents: "active",
+      listMode: "none",
+    });
     if (!dashboard) {
       notFound();
     }

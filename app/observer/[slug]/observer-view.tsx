@@ -140,7 +140,7 @@ export function ObserverSectionPage({
       <ObserverHeader dashboard={dashboard} />
       <ObserverNav channelSlug={dashboard.channel.slug} activeSection={sectionId} />
       <nav className="breadcrumb" aria-label="Observer navigation">
-        <Link href={`/observer/${dashboard.channel.slug}`}>Overview</Link>
+        <Link href={`/observer/${dashboard.channel.slug}`} prefetch={false}>Overview</Link>
         <span>{section.title}</span>
       </nav>
       <ObserverSection title={section.title} summary={section.summary}>
@@ -181,7 +181,7 @@ function ObserverNav({
 }) {
   return (
     <nav className="observer-nav" aria-label="Observer sections">
-      <Link className={!activeSection ? "active" : undefined} href={`/observer/${channelSlug}`}>
+      <Link className={!activeSection ? "active" : undefined} href={`/observer/${channelSlug}`} prefetch={false}>
         Overview
       </Link>
       {observerSections.map((section) => (
@@ -189,6 +189,7 @@ function ObserverNav({
           className={activeSection === section.id ? "active" : undefined}
           href={`/observer/${channelSlug}/${section.id}`}
           key={section.id}
+          prefetch={false}
         >
           {section.title}
         </Link>
@@ -279,7 +280,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection title="Event Log Link">
           <p className="section-note">
-            Deposit, withdrawal, join toll, and exit refund events are listed under <Link href={`/observer/${channel.slug}/events`}>Event Logs</Link>.
+            Deposit, withdrawal, join toll, and exit refund events are listed under <Link href={`/observer/${channel.slug}/events`} prefetch={false}>Event Logs</Link>.
           </p>
         </DetailSection>
       </>
@@ -311,7 +312,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection title="Event Log Link">
           <p className="section-note">
-            Join, exit, address-pair, and note-receive public key records are listed under <Link href={`/observer/${channel.slug}/events`}>Event Logs</Link>.
+            Join, exit, address-pair, and note-receive public key records are listed under <Link href={`/observer/${channel.slug}/events`} prefetch={false}>Event Logs</Link>.
           </p>
         </DetailSection>
       </>
@@ -571,7 +572,7 @@ function OverviewBlock({ title, href, children }: { title: string; href: string;
     <section className="overview-block">
       <div className="overview-block-heading">
         <h2>{title}</h2>
-        <Link href={href}>Details</Link>
+        <Link href={href} prefetch={false}>Details</Link>
       </div>
       <dl className="summary-list">{children}</dl>
     </section>
@@ -747,7 +748,7 @@ function EventTable({
       {pageParam && basePath && totalPages > 1 ? (
         <nav className="event-pagination" aria-label={`${title} pagination`}>
           {currentPage > 1 ? (
-            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage - 1)}>Previous {displayLimit}</Link>
+            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage - 1)} prefetch={false}>Previous {displayLimit}</Link>
           ) : (
             <span aria-disabled="true">Previous {displayLimit}</span>
           )}
@@ -755,7 +756,7 @@ function EventTable({
             Page {currentPage} of {totalPages}
           </span>
           {currentPage < totalPages ? (
-            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage + 1)}>Next {displayLimit}</Link>
+            <Link href={pageHref(basePath, searchParams ?? {}, pageParam, currentPage + 1)} prefetch={false}>Next {displayLimit}</Link>
           ) : (
             <span aria-disabled="true">Next {displayLimit}</span>
           )}
