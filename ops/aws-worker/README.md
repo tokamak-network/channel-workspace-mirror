@@ -28,7 +28,7 @@ ADMIN_TOKEN=...
 APP_REPO_URL=https://github.com/<owner>/<repo>.git
 APP_BRANCH=main
 NODE_MAJOR=22
-PRIVATE_STATE_CLI_VERSION=2.2.1
+PRIVATE_STATE_CLI_VERSION=latest
 ```
 
 The runtime RPC URL and RPC limits are not stored in this file. They are read from Neon through the
@@ -65,3 +65,7 @@ sudo journalctl -u channel-workspace-mirror-indexer.service -n 200 --no-pager
 
 The private-state CLI workspace lives under `/var/lib/channel-workspace-mirror` because the systemd
 service runs as the `channelmirror` system user with that home directory.
+
+Each worker run installs `@tokamak-private-dapps/private-state-cli@$PRIVATE_STATE_CLI_VERSION` into
+the worker user's private npm prefix before recovery starts. Leave `PRIVATE_STATE_CLI_VERSION=latest`
+to track the current CLI release, or set an exact version to pin worker runs.

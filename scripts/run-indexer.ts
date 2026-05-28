@@ -28,6 +28,8 @@ type WorkspaceRecovery = {
   fromGenesis: boolean;
 };
 
+const PRIVATE_STATE_CLI_PACKAGE = "@tokamak-private-dapps/private-state-cli";
+
 async function main() {
   const channel = DEFAULT_OBSERVER_CHANNEL;
   const config = await requireIndexerRuntimeConfig(channel.slug);
@@ -91,20 +93,52 @@ async function main() {
 }
 
 async function configurePrivateStateCli(config: Awaited<ReturnType<typeof requireIndexerRuntimeConfig>>) {
+  updatePrivateStateCli();
   ensureReadOnlyInstall();
   const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
   const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
   const rpcArgs = ["set", "rpc", "--network", "mainnet", "--rpc-url", config.rpc_url];
   rpcArgs.push("--log-requests-per-second", String(logRequestsPerSecond));
   rpcArgs.push("--block-range-cap", String(blockRangeCap));
-  run("private-state-cli", rpcArgs);
+  run(privateStateCliCommand(), rpcArgs);
+}
+
+function updatePrivateStateCli() {
+  const version = process.env.PRIVATE_STATE_CLI_VERSION?.trim() || "latest";
+  const prefix = privateStateCliPrefix();
+  fs.mkdirSync(prefix, { recursive: true });
+  run("npm", [
+    "install",
+    "--global",
+    "--prefix",
+    prefix,
+    `${PRIVATE_STATE_CLI_PACKAGE}@${version}`,
+  ], {
+    env: {
+      ...process.env,
+      npm_config_audit: "false",
+      npm_config_fund: "false",
+      npm_config_update_notifier: "false",
+    },
+  });
+  if (!fs.existsSync(privateStateCliCommand())) {
+    throw new Error(`private-state-cli was not installed at ${privateStateCliCommand()}.`);
+  }
+}
+
+function privateStateCliPrefix() {
+  return path.join(os.homedir(), ".private-state-cli");
+}
+
+function privateStateCliCommand() {
+  return path.join(privateStateCliPrefix(), "bin", "private-state-cli");
 }
 
 function ensureReadOnlyInstall() {
   if (hasReadOnlyInstall()) {
     return;
   }
-  run("private-state-cli", ["install", "--read-only"]);
+  run(privateStateCliCommand(), ["install", "--read-only"]);
 }
 
 function hasReadOnlyInstall() {
@@ -137,7 +171,7 @@ function hasReadOnlyInstall() {
 }
 
 function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
-  const result = run("private-state-cli", [
+  const result = run(privateStateCliCommand(), [
     "channel",
     "recover-workspace",
     "--channel-name",
@@ -214,7 +248,7 @@ async function publishMirror({
 }) {
   const targetDir = path.join(os.tmpdir(), `${channelName}-mirror-public`);
   fs.rmSync(targetDir, { recursive: true, force: true });
-  run("private-state-cli", [
+  run(privateStateCliCommand(), [
     "channel",
     "publish-workspace-mirror",
     "--channel-name",
@@ -235,9 +269,10 @@ async function publishMirror({
   };
 }
 
-function run(command: string, args: string[], options: { capture?: boolean } = {}) {
+function run(command: string, args: string[], options: { capture?: boolean; env?: NodeJS.ProcessEnv } = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
+    env: options.env,
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
   });
   if (result.status !== 0) {

@@ -8,7 +8,7 @@ APP_DIR="${APP_DIR:-/opt/${APP_NAME}}"
 ENV_FILE="${ENV_FILE:-/etc/${APP_NAME}.env}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 APP_BRANCH="${APP_BRANCH:-main}"
-PRIVATE_STATE_CLI_VERSION="${PRIVATE_STATE_CLI_VERSION:-2.2.1}"
+PRIVATE_STATE_CLI_VERSION="${PRIVATE_STATE_CLI_VERSION:-latest}"
 TIMER_INTERVAL="${TIMER_INTERVAL:-5min}"
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -24,7 +24,7 @@ ADMIN_TOKEN=...
 APP_REPO_URL=https://github.com/<owner>/<repo>.git
 APP_BRANCH=main
 NODE_MAJOR=22
-PRIVATE_STATE_CLI_VERSION=2.2.1
+PRIVATE_STATE_CLI_VERSION=latest
 EOF
   chmod 0600 "${ENV_FILE}"
   echo "Created ${ENV_FILE}. Fill in real values, then run this script again." >&2
