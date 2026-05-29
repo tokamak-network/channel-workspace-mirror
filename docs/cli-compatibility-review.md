@@ -46,10 +46,10 @@ transitions, and the final replay result against `ChannelManager.currentRootVect
 
 ## Gaps To Address
 
-These items do not currently break compatibility when the upload input is the unmodified output of
-`private-state-cli channel publish-workspace-mirror`. They are still worth fixing because the server
-claims to validate uploaded mirror artifacts and should reject malformed operator uploads before
-they are published.
+These items do not currently break compatibility when the upload input is the unmodified mirror
+output of `private-state-cli channel recover-workspace --publish-workspace-mirror`. They are still
+worth fixing because the server claims to validate uploaded mirror artifacts and should reject
+malformed operator uploads before they are published.
 
 ### Require `sizeBytes` in upload validation
 
@@ -104,7 +104,8 @@ Recommended fix:
 ### Add an integration fixture that matches real CLI output
 
 Current tests cover a minimal synthetic upload directory. They do not exercise a real
-`channel publish-workspace-mirror` output shape or route lookup through the expected public paths.
+`channel recover-workspace --publish-workspace-mirror` output shape or route lookup through the
+expected public paths.
 
 Recommended fix:
 

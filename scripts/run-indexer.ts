@@ -28,6 +28,11 @@ type WorkspaceRecovery = {
   fromGenesis: boolean;
 };
 
+type MirrorPublishOptions = {
+  account: string;
+  outputDir: string;
+};
+
 const PRIVATE_STATE_CLI_PACKAGE = "@tokamak-private-dapps/private-state-cli";
 type IndexerPhase = "observer" | "mirror";
 
@@ -37,12 +42,20 @@ async function main() {
   const state = await getIndexerRunState(channel.slug);
   const now = new Date();
   const mirrorDue = isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
-  let phase: IndexerPhase = "observer";
+  let phase: IndexerPhase = mirrorDue ? "mirror" : "observer";
 
   try {
+    const mirrorPublish = mirrorDue ? mirrorPublishOptions(channel.name, config.mirror_publish_account) : null;
     await configurePrivateStateCli(config);
     const localWorkspaceRecovered = hasLocalRecoveredWorkspace(channel.name);
-    const recovery = recoverWorkspace(channel.name, !localWorkspaceRecovered);
+    if (mirrorPublish) {
+      await updateIndexerRunState(channel.slug, { mirrorRunAt: now });
+    }
+    const recovery = recoverWorkspace({
+      channelName: channel.name,
+      fromGenesis: !localWorkspaceRecovered,
+      publishMirror: mirrorPublish ?? undefined,
+    });
     const rawHistoryDir = recovery?.result.rpcCallHistory?.historyDir ?? null;
 
     if (recovery?.fromGenesis) {
@@ -64,13 +77,9 @@ async function main() {
     });
 
     let mirror = null;
-    if (mirrorDue) {
+    if (mirrorPublish) {
       phase = "mirror";
-      if (!config.mirror_publish_account) {
-        throw new Error("mirrorPublishAccount is required when mirror publishing is enabled.");
-      }
-      await updateIndexerRunState(channel.slug, { mirrorRunAt: now, rawHistoryDir });
-      mirror = await publishMirror({ channelName: channel.name, account: config.mirror_publish_account });
+      mirror = await uploadMirrorOutput(mirrorPublish.outputDir);
       await updateIndexerRunState(channel.slug, {
         mirrorSuccessAt: new Date(),
         rawHistoryDir,
@@ -173,8 +182,16 @@ function hasReadOnlyInstall() {
   }
 }
 
-function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
-  const result = run(privateStateCliCommand(), [
+function runRecoverWorkspace({
+  channelName,
+  fromGenesis,
+  publishMirror,
+}: {
+  channelName: string;
+  fromGenesis: boolean;
+  publishMirror?: MirrorPublishOptions;
+}) {
+  const args = [
     "channel",
     "recover-workspace",
     "--channel-name",
@@ -186,26 +203,45 @@ function runRecoverWorkspace(channelName: string, fromGenesis: boolean) {
     ...(fromGenesis ? ["--from-genesis"] : []),
     "--output-raw",
     "--json",
-  ], { capture: true });
+  ];
+  if (publishMirror) {
+    fs.rmSync(publishMirror.outputDir, { recursive: true, force: true });
+    args.push(
+      "--publish-workspace-mirror",
+      "--leader-account",
+      publishMirror.account,
+      "--output",
+      publishMirror.outputDir,
+    );
+  }
+  const result = run(privateStateCliCommand(), args, { capture: true });
   return parseLastJsonObject(result.stdout) as RecoverResult;
 }
 
-function recoverWorkspace(channelName: string, fromGenesis: boolean): WorkspaceRecovery {
+function recoverWorkspace({
+  channelName,
+  fromGenesis,
+  publishMirror,
+}: {
+  channelName: string;
+  fromGenesis: boolean;
+  publishMirror?: MirrorPublishOptions;
+}): WorkspaceRecovery {
   if (fromGenesis) {
     return {
-      result: runRecoverWorkspace(channelName, true),
+      result: runRecoverWorkspace({ channelName, fromGenesis: true, publishMirror }),
       fromGenesis: true,
     };
   }
   try {
     return {
-      result: runRecoverWorkspace(channelName, false),
+      result: runRecoverWorkspace({ channelName, fromGenesis: false, publishMirror }),
       fromGenesis: false,
     };
   } catch (error) {
     console.warn(`Incremental workspace recovery failed; retrying from genesis: ${error instanceof Error ? error.message : String(error)}`);
     return {
-      result: runRecoverWorkspace(channelName, true),
+      result: runRecoverWorkspace({ channelName, fromGenesis: true, publishMirror }),
       fromGenesis: true,
     };
   }
@@ -242,31 +278,22 @@ function isPositiveBlockNumber(value: unknown) {
   return parsed > 0n;
 }
 
-async function publishMirror({
-  channelName,
-  account,
-}: {
-  channelName: string;
-  account: string;
-}) {
+function mirrorPublishOptions(channelName: string, account: string | null): MirrorPublishOptions {
+  if (!account) {
+    throw new Error("mirrorPublishAccount is required when mirror publishing is enabled.");
+  }
   const targetDir = path.join(os.tmpdir(), `${channelName}-mirror-public`);
-  fs.rmSync(targetDir, { recursive: true, force: true });
-  run(privateStateCliCommand(), [
-    "channel",
-    "publish-workspace-mirror",
-    "--channel-name",
-    channelName,
-    "--network",
-    "mainnet",
-    "--account",
+  return {
     account,
-    "--output",
-    targetDir,
-  ]);
-  const upload = await validateMirrorUploadDirectory(targetDir);
+    outputDir: targetDir,
+  };
+}
+
+async function uploadMirrorOutput(outputDir: string) {
+  const upload = await validateMirrorUploadDirectory(outputDir);
   const result = await publishMirrorUpload(upload);
   return {
-    outputDir: targetDir,
+    outputDir,
     checkpointBlock: upload.manifest.checkpoint.recoveryLastScannedBlock,
     publish: result,
   };

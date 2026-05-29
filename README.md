@@ -55,10 +55,13 @@ and stable route-to-Blob mapping.
 Generate mirror files with the private-state CLI:
 
 ```bash
-private-state-cli channel publish-workspace-mirror \
+private-state-cli channel recover-workspace \
   --channel-name <CHANNEL> \
   --network mainnet \
-  --account <LEADER_ACCOUNT> \
+  --source rpc \
+  --output-raw \
+  --publish-workspace-mirror \
+  --leader-account <LEADER_ACCOUNT> \
   --output ./mirror-public
 ```
 
@@ -136,12 +139,12 @@ It performs the operator flow in this order:
 - install `@tokamak-private-dapps/private-state-cli@latest` into `<worker-home>/.private-state-cli`
 - `private-state-cli install --read-only`
 - `private-state-cli set rpc` from the DB runtime config
-- `private-state-cli channel recover-workspace --source rpc --output-raw`
+- `private-state-cli channel recover-workspace --source rpc --output-raw`, with
+  `--publish-workspace-mirror --leader-account ... --output ...` added when mirror publishing is due
 - observer raw-history import for state-recovery events
 - targeted observer RPC scans for bridge, participant, note-delivery, verifier, admin, and upgrade
   events
-- optional `private-state-cli channel publish-workspace-mirror` and mirror upload when mirror
-  publishing is due
+- mirror output validation and upload when mirror publishing is due
 
 The first worker run on a persistent host performs `recover-workspace --from-genesis --output-raw`
 when the local CLI workspace has no recovered channel snapshot yet. Later runs use that host's CLI

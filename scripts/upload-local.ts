@@ -19,7 +19,7 @@ function parseDirectoryArg(args: string[]) {
       "Usage: npm run upload:local -- <mirror-public-directory>",
       "",
       "The directory must be the unmodified output of:",
-      "private-state-cli channel publish-workspace-mirror --output <mirror-public-directory>",
+      "private-state-cli channel recover-workspace --publish-workspace-mirror --leader-account <ACCOUNT> --output <mirror-public-directory>",
     ].join("\n"));
     process.exit(args.includes("--help") || args.includes("-h") ? 0 : 1);
   }
