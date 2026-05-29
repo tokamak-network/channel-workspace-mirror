@@ -29,6 +29,7 @@ type WorkspaceRecovery = {
 };
 
 const PRIVATE_STATE_CLI_PACKAGE = "@tokamak-private-dapps/private-state-cli";
+type IndexerPhase = "observer" | "mirror";
 
 async function main() {
   const channel = DEFAULT_OBSERVER_CHANNEL;
@@ -36,6 +37,7 @@ async function main() {
   const state = await getIndexerRunState(channel.slug);
   const now = new Date();
   const mirrorDue = isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
+  let phase: IndexerPhase = "observer";
 
   try {
     await configurePrivateStateCli(config);
@@ -58,11 +60,12 @@ async function main() {
     await updateIndexerRunState(channel.slug, {
       observerSuccessAt: new Date(),
       rawHistoryDir,
-      error: null,
+      observerError: null,
     });
 
     let mirror = null;
     if (mirrorDue) {
+      phase = "mirror";
       if (!config.mirror_publish_account) {
         throw new Error("mirrorPublishAccount is required when mirror publishing is enabled.");
       }
@@ -72,7 +75,7 @@ async function main() {
         mirrorSuccessAt: new Date(),
         rawHistoryDir,
         checkpointBlock: mirror.checkpointBlock,
-        error: null,
+        mirrorError: null,
       });
     }
 
@@ -85,8 +88,9 @@ async function main() {
       mirror,
     }, null, 2));
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     await updateIndexerRunState(channel.slug, {
-      error: error instanceof Error ? error.message : String(error),
+      ...(phase === "mirror" ? { mirrorError: message } : { observerError: message }),
     });
     throw error;
   }

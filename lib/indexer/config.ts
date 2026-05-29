@@ -15,8 +15,10 @@ export type IndexerRunState = {
   channel_slug: string;
   last_observer_run_at: string | null;
   last_observer_success_at: string | null;
+  last_observer_error: string | null;
   last_mirror_run_at: string | null;
   last_mirror_success_at: string | null;
+  last_mirror_error: string | null;
   last_raw_history_dir: string | null;
   last_checkpoint_block: string | null;
   last_error: string | null;
@@ -90,7 +92,9 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
 export async function getIndexerRunState(channelSlug: string) {
   const sql = getSql();
   const rows = await sql`
-    select *
+    select
+      *,
+      coalesce(last_mirror_error, last_observer_error, last_error) as last_error
     from indexer_run_state
     where channel_slug = ${channelSlug}
     limit 1
@@ -107,17 +111,27 @@ export async function updateIndexerRunState(
     mirrorSuccessAt?: Date;
     rawHistoryDir?: string | null;
     checkpointBlock?: string | number | bigint | null;
+    observerError?: string | null;
+    mirrorError?: string | null;
     error?: string | null;
   },
 ) {
   const sql = getSql();
+  const hasObserverError = Object.hasOwn(state, "observerError");
+  const hasMirrorError = Object.hasOwn(state, "mirrorError");
+  const hasLegacyError = Object.hasOwn(state, "error");
+  const legacyError = state.error
+    ?? (hasMirrorError && state.mirrorError ? state.mirrorError : null)
+    ?? (hasObserverError && state.observerError ? state.observerError : null);
   const rows = await sql`
     insert into indexer_run_state (
       channel_slug,
       last_observer_run_at,
       last_observer_success_at,
+      last_observer_error,
       last_mirror_run_at,
       last_mirror_success_at,
+      last_mirror_error,
       last_raw_history_dir,
       last_checkpoint_block,
       last_error,
@@ -127,21 +141,34 @@ export async function updateIndexerRunState(
       ${channelSlug},
       ${state.observerRunAt?.toISOString() ?? null}::timestamptz,
       ${state.observerSuccessAt?.toISOString() ?? null}::timestamptz,
+      ${hasObserverError ? state.observerError ?? null : null},
       ${state.mirrorRunAt?.toISOString() ?? null}::timestamptz,
       ${state.mirrorSuccessAt?.toISOString() ?? null}::timestamptz,
+      ${hasMirrorError ? state.mirrorError ?? null : null},
       ${state.rawHistoryDir ?? null},
       ${state.checkpointBlock == null ? null : String(state.checkpointBlock)}::bigint,
-      ${state.error ?? null},
+      ${legacyError},
       now()
     )
     on conflict (channel_slug) do update set
       last_observer_run_at = coalesce(excluded.last_observer_run_at, indexer_run_state.last_observer_run_at),
       last_observer_success_at = coalesce(excluded.last_observer_success_at, indexer_run_state.last_observer_success_at),
+      last_observer_error = case
+        when ${hasObserverError}::boolean then excluded.last_observer_error
+        else indexer_run_state.last_observer_error
+      end,
       last_mirror_run_at = coalesce(excluded.last_mirror_run_at, indexer_run_state.last_mirror_run_at),
       last_mirror_success_at = coalesce(excluded.last_mirror_success_at, indexer_run_state.last_mirror_success_at),
+      last_mirror_error = case
+        when ${hasMirrorError}::boolean then excluded.last_mirror_error
+        else indexer_run_state.last_mirror_error
+      end,
       last_raw_history_dir = coalesce(excluded.last_raw_history_dir, indexer_run_state.last_raw_history_dir),
       last_checkpoint_block = coalesce(excluded.last_checkpoint_block, indexer_run_state.last_checkpoint_block),
-      last_error = excluded.last_error,
+      last_error = case
+        when ${hasLegacyError || hasObserverError || hasMirrorError}::boolean then excluded.last_error
+        else indexer_run_state.last_error
+      end,
       updated_at = now()
     returning *
   ` as IndexerRunState[];
