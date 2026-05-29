@@ -133,8 +133,7 @@ workspace, recovery index, and raw RPC history on durable local disk.
 
 It performs the operator flow in this order:
 
-- install `@tokamak-private-dapps/private-state-cli@$PRIVATE_STATE_CLI_VERSION` into
-  `<worker-home>/.private-state-cli`
+- install `@tokamak-private-dapps/private-state-cli@latest` into `<worker-home>/.private-state-cli`
 - `private-state-cli install --read-only`
 - `private-state-cli set rpc` from the DB runtime config
 - `private-state-cli channel recover-workspace --source rpc --output-raw`

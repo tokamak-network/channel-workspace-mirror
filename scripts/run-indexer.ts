@@ -108,7 +108,6 @@ async function configurePrivateStateCli(config: Awaited<ReturnType<typeof requir
 }
 
 function updatePrivateStateCli() {
-  const version = process.env.PRIVATE_STATE_CLI_VERSION?.trim() || "latest";
   const prefix = privateStateCliPrefix();
   fs.mkdirSync(prefix, { recursive: true });
   run("npm", [
@@ -116,7 +115,7 @@ function updatePrivateStateCli() {
     "--global",
     "--prefix",
     prefix,
-    `${PRIVATE_STATE_CLI_PACKAGE}@${version}`,
+    `${PRIVATE_STATE_CLI_PACKAGE}@latest`,
   ], {
     env: {
       ...process.env,
