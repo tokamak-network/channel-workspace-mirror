@@ -205,7 +205,6 @@ function runRecoverWorkspace({
     "--json",
   ];
   if (publishMirror) {
-    fs.rmSync(publishMirror.outputDir, { recursive: true, force: true });
     args.push(
       "--publish-workspace-mirror",
       "--leader-account",
