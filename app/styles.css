@@ -133,6 +133,7 @@ dd {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
+  min-width: 0;
   width: 100%;
   background: #ffffff;
   border: 1px solid #d9dde5;
@@ -161,6 +162,8 @@ dd {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 
@@ -171,6 +174,8 @@ dd {
   font-weight: 800;
   line-height: 1.2;
   margin-top: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .overview-panel {
@@ -247,6 +252,7 @@ dd {
   border-top: 1px solid #d9dde5;
   padding: 24px 0 6px;
   margin-top: 14px;
+  min-width: 0;
 }
 
 .section-heading {
@@ -276,12 +282,14 @@ dd {
 .section-body {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .detail-section {
   max-width: none;
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .detail-section + .detail-section {
@@ -349,6 +357,11 @@ dd {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px 20px;
   margin: 0;
+  min-width: 0;
+}
+
+.info-item {
+  min-width: 0;
 }
 
 .info-item dd {
@@ -474,6 +487,7 @@ dd {
   max-width: none;
   border-top: 1px solid #e3e7ee;
   padding-top: 14px;
+  min-width: 0;
 }
 
 .event-heading {
@@ -482,11 +496,14 @@ dd {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 8px;
+  min-width: 0;
 }
 
 .event-heading h3 {
   font-size: 15px;
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .event-heading span {
@@ -497,6 +514,7 @@ dd {
 
 .table-wrap {
   overflow-x: auto;
+  min-width: 0;
 }
 
 .event-pagination {
