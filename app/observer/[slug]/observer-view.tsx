@@ -295,7 +295,7 @@ function SectionDetail({
             <InfoItem label="Active participants" value={stats.channelParticipantsCount} />
             <InfoItem label="Joined participants" value={stats.joinedParticipantsCount} />
             <InfoItem label="Exited participants" value={stats.exitedParticipantsCount} />
-            <InfoItem label="Burnt toll fee (TON)" value={formatTokenAmount(stats.realizedBurntTollFee)} />
+            <InfoItem label="Burnt toll (TON)" value={formatTokenAmount(stats.realizedBurntToll)} />
             <InfoItem label="Channel ID" value={channel.channel_id} mono />
             <InfoItem label="DApp ID" value={channel.dapp_id} mono />
             <InfoItem label="Leader" value={channel.leader ?? "unknown"} mono />
