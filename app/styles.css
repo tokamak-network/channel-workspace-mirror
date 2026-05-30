@@ -362,6 +362,7 @@ dd {
 }
 
 .toll-policy-table {
+  background: transparent;
   border: 1px solid #cfd6e1;
   table-layout: auto;
   width: min(640px, 100%);
@@ -380,6 +381,7 @@ dd {
 }
 
 .toll-policy-table td {
+  background: transparent;
   color: #16181d;
   font-size: 13px;
   font-weight: 650;
