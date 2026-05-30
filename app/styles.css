@@ -384,7 +384,8 @@ dd {
   background: transparent;
   color: #16181d;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 400;
+  line-height: 1.45;
 }
 
 .external-link-list {
