@@ -357,26 +357,32 @@ dd {
   line-height: 1.45;
 }
 
-.toll-policy {
-  display: grid;
-  gap: 6px;
-  margin: 0;
+.info-item-wide {
+  grid-column: 1 / -1;
 }
 
-.toll-policy div {
-  display: grid;
-  gap: 2px;
+.toll-policy-table {
+  border: 1px solid #cfd6e1;
+  table-layout: auto;
+  width: min(640px, 100%);
 }
 
-.toll-policy dt,
-.toll-policy dd {
-  font-size: 12px;
-  line-height: 1.35;
+.toll-policy-table th,
+.toll-policy-table td {
+  border: 1px solid #dfe4ec;
+  padding: 8px 10px;
 }
 
-.toll-policy dd {
+.toll-policy-table th {
+  background: #f8fafc;
+  color: #5d6675;
+  font-size: 11px;
+}
+
+.toll-policy-table td {
   color: #16181d;
-  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .external-link-list {

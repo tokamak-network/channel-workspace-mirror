@@ -254,7 +254,7 @@ function SectionDetail({
             <InfoItem label="DApp metadata schema" value={channel.dapp_metadata_digest_schema ?? "unknown"} mono />
             <InfoItem label="Current root vector hash" value={channel.current_root_vector_hash ?? "unknown"} mono />
             <InfoItem label="Current join toll (TON)" value={formatTokenAmount(channel.current_join_toll ?? "0")} />
-            <InfoItem label="Toll refund policy" value={<TollRefundPolicy channel={channel} />} />
+            <InfoItem label="Toll refund policy" value={<TollRefundPolicy channel={channel} />} wide />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Source & Artifacts">
@@ -662,13 +662,15 @@ function InfoItem({
   label,
   value,
   mono = false,
+  wide = false,
 }: {
   label: string;
   value: ReactNode;
   mono?: boolean;
+  wide?: boolean;
 }) {
   return (
-    <div className="info-item">
+    <div className={wide ? "info-item info-item-wide" : "info-item"}>
       <dt>{label}</dt>
       <dd className={mono ? "mono" : undefined}>{value}</dd>
     </div>
@@ -684,16 +686,24 @@ function TollRefundPolicy({ channel }: { channel: ObserverChannel }) {
     return "invalid policy snapshot";
   }
   return (
-    <dl className="toll-policy">
-      {schedule.map((item) => (
-        <div key={item.label}>
-          <dt>{item.label}</dt>
-          <dd>
-            {formatBpsPercent(item.refundBps)} refunded / {formatBpsPercent(10000n - item.refundBps)} burnt
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <table className="toll-policy-table">
+      <thead>
+        <tr>
+          <th>Exit timing</th>
+          <th>Refunded</th>
+          <th>Burnt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {schedule.map((item) => (
+          <tr key={item.label}>
+            <td>{item.label}</td>
+            <td>{formatBpsPercent(item.refundBps)}</td>
+            <td>{formatBpsPercent(10000n - item.refundBps)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -993,10 +1003,10 @@ function tollRefundSchedule(channel: ObserverChannel) {
     return "invalid" as const;
   }
   return [
-    { label: `Up to ${formatDurationSeconds(cutoff1)}`, refundBps: bps1 },
-    { label: `${formatDurationSeconds(cutoff1)} to ${formatDurationSeconds(cutoff2)}`, refundBps: bps2 },
-    { label: `${formatDurationSeconds(cutoff2)} to ${formatDurationSeconds(cutoff3)}`, refundBps: bps3 },
-    { label: `After ${formatDurationSeconds(cutoff3)}`, refundBps: bps4 },
+    { label: `0-${formatDurationShort(cutoff1)}`, refundBps: bps1 },
+    { label: `${formatDurationShort(cutoff1)}-${formatDurationShort(cutoff2)}`, refundBps: bps2 },
+    { label: `${formatDurationShort(cutoff2)}-${formatDurationShort(cutoff3)}`, refundBps: bps3 },
+    { label: `After ${formatDurationShort(cutoff3)}`, refundBps: bps4 },
   ];
 }
 
@@ -1007,19 +1017,18 @@ function parseOptionalUnsignedInteger(value: string | null) {
   return BigInt(value);
 }
 
-function formatDurationSeconds(value: bigint) {
+function formatDurationShort(value: bigint) {
   const units = [
-    { label: "day", seconds: 86400n },
-    { label: "hour", seconds: 3600n },
-    { label: "minute", seconds: 60n },
+    { label: "d", seconds: 86400n },
+    { label: "h", seconds: 3600n },
+    { label: "m", seconds: 60n },
   ] as const;
   for (const unit of units) {
     if (value !== 0n && value % unit.seconds === 0n) {
-      const amount = value / unit.seconds;
-      return `${amount.toString()} ${unit.label}${amount === 1n ? "" : "s"}`;
+      return `${(value / unit.seconds).toString()}${unit.label}`;
     }
   }
-  return `${value.toString()} seconds`;
+  return `${value.toString()}s`;
 }
 
 function formatBpsPercent(value: bigint) {
