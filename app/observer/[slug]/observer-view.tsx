@@ -85,8 +85,8 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
       </section>
 
       <section className="metric-grid" aria-label="Channel metrics">
-        <Metric label="Bridge deposits" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
-        <Metric label="Bridge withdrawals" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
+        <Metric label="Bridge deposits (TON)" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
+        <Metric label="Bridge withdrawals (TON)" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
         <Metric label="Active participants" value={stats.channelParticipantsCount} />
         <Metric label="Indexed events" value={totalEvents} />
       </section>
@@ -97,8 +97,8 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
           <InfoItem label="DApp ID" value={channel.dapp_id} mono />
         </OverviewBlock>
         <OverviewBlock title="Bridge Status" href={`/observer/${channel.slug}/bridge`}>
-          <InfoItem label="Deposits" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
-          <InfoItem label="Withdrawals" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
+          <InfoItem label="Deposits (TON)" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
+          <InfoItem label="Withdrawals (TON)" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
         </OverviewBlock>
         <OverviewBlock title="Participants" href={`/observer/${channel.slug}/participants`}>
           <InfoItem label="Active" value={stats.channelParticipantsCount} />
@@ -246,7 +246,7 @@ function SectionDetail({
             <InfoItem label="DApp metadata hash" value={channel.dapp_metadata_digest ?? "unknown"} mono />
             <InfoItem label="DApp metadata schema" value={channel.dapp_metadata_digest_schema ?? "unknown"} mono />
             <InfoItem label="Current root vector hash" value={channel.current_root_vector_hash ?? "unknown"} mono />
-            <InfoItem label="Current join toll" value={formatTokenAmount(channel.current_join_toll ?? "0")} />
+            <InfoItem label="Current join toll (TON)" value={formatTokenAmount(channel.current_join_toll ?? "0")} />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Source & Artifacts">
@@ -265,9 +265,9 @@ function SectionDetail({
       <>
         <DetailSection title="Bridge Summary">
           <InfoGrid>
-            <InfoItem label="Total L1 bridge deposits" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
-            <InfoItem label="Total L1 bridge withdrawals" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
-            <InfoItem label="Net bridged amount" value={formatTokenAmount(subtractTokenAmounts(stats.totalL1BridgeDeposits, stats.totalL1BridgeWithdrawals))} />
+            <InfoItem label="Total L1 bridge deposits (TON)" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
+            <InfoItem label="Total L1 bridge withdrawals (TON)" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
+            <InfoItem label="Net bridged amount (TON)" value={formatTokenAmount(subtractTokenAmounts(stats.totalL1BridgeDeposits, stats.totalL1BridgeWithdrawals))} />
             <InfoItem label="BridgeCore" value={channel.bridge_core} mono />
             <InfoItem label="BridgeTokenVault" value={channel.bridge_token_vault} mono />
             <InfoItem label="Canonical TON" value={channel.canonical_asset ?? "unknown"} mono />
@@ -295,7 +295,7 @@ function SectionDetail({
             <InfoItem label="Active participants" value={stats.channelParticipantsCount} />
             <InfoItem label="Joined participants" value={stats.joinedParticipantsCount} />
             <InfoItem label="Exited participants" value={stats.exitedParticipantsCount} />
-            <InfoItem label="Burnt toll fee" value={formatTokenAmount(stats.realizedBurntTollFee)} />
+            <InfoItem label="Burnt toll fee (TON)" value={formatTokenAmount(stats.realizedBurntTollFee)} />
             <InfoItem label="Channel ID" value={channel.channel_id} mono />
             <InfoItem label="DApp ID" value={channel.dapp_id} mono />
             <InfoItem label="Leader" value={channel.leader ?? "unknown"} mono />
@@ -324,7 +324,7 @@ function SectionDetail({
     const eventCountSections = [
       {
         id: "bridge-event-list",
-        title: "Bridge deposits, withdrawals, tolls, and refunds",
+        title: "Bridge deposits, withdrawals, tolls, and refunds (TON amounts)",
         count: dashboard.listTotals.bridgeEvents,
       },
       {
@@ -371,7 +371,7 @@ function SectionDetail({
         <DetailSection id="bridge-events" title="Bridge Events">
           <EventTable
             id="bridge-event-list"
-            title="Bridge deposits, withdrawals, tolls, and refunds"
+            title="Bridge deposits, withdrawals, tolls, and refunds (TON amounts)"
             events={lists.bridgeEvents}
             displayLimit={15}
             totalCount={dashboard.listTotals.bridgeEvents}
@@ -778,8 +778,8 @@ function DecodedFields({ fields, value }: { fields?: string[]; value: Record<str
     <dl className="decoded-fields">
       {entries.map(([key, field]) => (
         <div key={key}>
-          <dt>{key}</dt>
-          <dd>{formatDecodedValue(field)}</dd>
+          <dt>{decodedFieldLabel(key)}</dt>
+          <dd>{formatDecodedValue(key, field)}</dd>
         </div>
       ))}
     </dl>
@@ -964,7 +964,16 @@ function subtractTokenAmounts(left: string, right: string) {
   return (BigInt(left.split(".")[0] || "0") - BigInt(right.split(".")[0] || "0")).toString();
 }
 
-function formatDecodedValue(value: unknown): ReactNode {
+const TOKEN_AMOUNT_FIELDS = new Set(["amount", "joinTollPaid"]);
+
+function decodedFieldLabel(key: string) {
+  return TOKEN_AMOUNT_FIELDS.has(key) ? `${key} (TON)` : key;
+}
+
+function formatDecodedValue(key: string, value: unknown): ReactNode {
+  if (TOKEN_AMOUNT_FIELDS.has(key)) {
+    return formatTokenAmount(String(value ?? "0"));
+  }
   if (typeof value === "string") {
     return <CopyableValue displayValue={shortHash(value)} value={value} />;
   }
