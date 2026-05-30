@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getPrivateStateCliLatestVersion } from "@/lib/observer/npm-package";
 import { getObserverDashboard, type ObserverEventListName, type ObserverEventListPage } from "@/lib/observer/queries";
 import { isObserverSection, ObserverSectionPage } from "../observer-view";
 
@@ -37,17 +38,31 @@ export default async function ObserverChannelSectionPage({
     notFound();
   }
 
-  const dashboard = await getObserverDashboard(slug, {
-    includeIncidents: section === "notices",
-    includeParticipantAccounting: section === "participants",
-    listMode: section === "events" ? "events" : section === "upgrades" ? "upgrades" : "none",
-    eventListPages: section === "events" ? eventListPages(resolvedSearchParams) : undefined,
-  });
+  const [dashboard, npmPackageVersion] = await Promise.all([
+    getObserverDashboard(slug, {
+      includeIncidents: section === "notices",
+      includeParticipantAccounting: section === "participants",
+      listMode: section === "events" ? "events" : section === "upgrades" ? "upgrades" : "none",
+      eventListPages: section === "events" ? eventListPages(resolvedSearchParams) : undefined,
+    }),
+    usesNpmPackageVersion(section) ? getPrivateStateCliLatestVersion() : Promise.resolve(null),
+  ]);
   if (!dashboard) {
     notFound();
   }
 
-  return <ObserverSectionPage dashboard={dashboard} sectionId={section} searchParams={resolvedSearchParams} />;
+  return (
+    <ObserverSectionPage
+      dashboard={dashboard}
+      sectionId={section}
+      searchParams={resolvedSearchParams}
+      npmPackageVersion={npmPackageVersion}
+    />
+  );
+}
+
+function usesNpmPackageVersion(section: string) {
+  return section === "channel" || section === "upgrades";
 }
 
 function eventListPages(searchParams: Record<string, string | string[] | undefined>): Partial<Record<ObserverEventListName, ObserverEventListPage>> {

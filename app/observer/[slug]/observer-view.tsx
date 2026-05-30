@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PRIVATE_STATE_CLI_NPM_URL } from "@/lib/observer/npm-package";
 import type { ObserverDashboard, ObserverEventRow, ObserverIncidentRow } from "@/lib/observer/queries";
 import { CopyableValue } from "./copyable-value";
 
@@ -12,9 +13,6 @@ type ExternalLinkItem = {
 };
 
 const TOKAMAK_DOCS_INDEX_URL = "https://github.com/tokamak-network/Tokamak-zk-EVM-contracts/blob/main/docs/index.md";
-const PRIVATE_STATE_CLI_NPM_URL = "https://www.npmjs.com/package/@tokamak-private-dapps/private-state-cli";
-const PRIVATE_STATE_CLI_LATEST_VERSION = "2.2.1";
-
 type ObserverSectionDefinition = {
   id: SectionId;
   title: string;
@@ -125,10 +123,12 @@ export function ObserverSectionPage({
   dashboard,
   sectionId,
   searchParams = {},
+  npmPackageVersion = null,
 }: {
   dashboard: ObserverDashboard;
   sectionId: SectionId;
   searchParams?: ObserverSearchParams;
+  npmPackageVersion?: string | null;
 }) {
   const section = observerSections.find((item) => item.id === sectionId);
   if (!section) {
@@ -144,7 +144,12 @@ export function ObserverSectionPage({
         <span>{section.title}</span>
       </nav>
       <ObserverSection title={section.title} summary={section.summary}>
-        <SectionDetail dashboard={dashboard} sectionId={sectionId} searchParams={searchParams} />
+        <SectionDetail
+          dashboard={dashboard}
+          sectionId={sectionId}
+          searchParams={searchParams}
+          npmPackageVersion={npmPackageVersion ?? null}
+        />
       </ObserverSection>
     </main>
   );
@@ -202,10 +207,12 @@ function SectionDetail({
   dashboard,
   sectionId,
   searchParams,
+  npmPackageVersion,
 }: {
   dashboard: ObserverDashboard;
   sectionId: SectionId;
   searchParams: ObserverSearchParams;
+  npmPackageVersion: string | null;
 }) {
   const { channel, stats, lists } = dashboard;
   const verifierVersion = `Tokamak ${channel.tokamak_verifier_version ?? "unknown"} / Groth16 ${channel.groth_verifier_version ?? "unknown"}`;
@@ -254,7 +261,7 @@ function SectionDetail({
           <InfoGrid>
             <InfoItem label="Deployment Artifacts & Commits" value={<ExternalLinks links={deploymentArtifactLinks(channel)} />} />
             <InfoItem label="Source verification & Bytecode hash" value={<ExternalLinks links={sourceAndBytecodeLinks(channel)} />} />
-            <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
+            <InfoItem label="NPM package version" value={<NpmPackageVersion version={npmPackageVersion} />} />
           </InfoGrid>
         </DetailSection>
       </>
@@ -489,7 +496,7 @@ function SectionDetail({
             <InfoItem label="Deployment block" value={channel.genesis_block} mono />
             <InfoItem label="Current state refreshed" value={formatDate(channel.current_state_refreshed_at)} />
             <InfoItem label="Deployment Artifacts & Commits" value={<ExternalLinks links={deploymentArtifactLinks(channel)} />} />
-            <InfoItem label="NPM package version" value={<NpmPackageVersion />} />
+            <InfoItem label="NPM package version" value={<NpmPackageVersion version={npmPackageVersion} />} />
             <InfoItem label="Source verification & Bytecode hash" value={<ExternalLinks links={sourceAndBytecodeLinks(channel)} />} />
           </InfoGrid>
         </DetailSection>
@@ -825,10 +832,10 @@ function ExternalLinks({ links }: { links: ExternalLinkItem[] }) {
   );
 }
 
-function NpmPackageVersion() {
+function NpmPackageVersion({ version }: { version: string | null }) {
   return (
     <a href={PRIVATE_STATE_CLI_NPM_URL} rel="noreferrer" target="_blank">
-      @tokamak-private-dapps/private-state-cli {PRIVATE_STATE_CLI_LATEST_VERSION}
+      @tokamak-private-dapps/private-state-cli {version ?? "latest unavailable"}
     </a>
   );
 }
