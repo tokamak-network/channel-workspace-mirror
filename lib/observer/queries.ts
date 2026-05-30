@@ -81,6 +81,7 @@ export type ObserverEventListPage = {
 export type ObserverDashboardOptions = {
   listMode?: "all" | "events" | "upgrades" | "none";
   includeIncidents?: boolean | "active";
+  includeParticipantAccounting?: boolean;
   eventListPages?: Partial<Record<ObserverEventListName, ObserverEventListPage>>;
 };
 
@@ -99,6 +100,7 @@ export type ObserverDashboard = {
     channelParticipantsCount: string;
     joinedParticipantsCount: string;
     exitedParticipantsCount: string;
+    realizedBurntTollFee: string;
     eventCounts: Record<string, string>;
   };
   lists: {
@@ -171,7 +173,7 @@ export async function getObserverDashboard(
   }
 
   const sql = getSql();
-  const [syncRows, channelCreatedRows, latestTransitions, totals, participantRows, countRows] = await Promise.all([
+  const [syncRows, channelCreatedRows, latestTransitions, totals, participantRows, burntTollRows, countRows] = await Promise.all([
     sql`
       select last_scanned_block, latest_block, updated_at
       from observer_sync_state
@@ -214,6 +216,9 @@ export async function getObserverDashboard(
             and l1_address not in (select l1_address from exited where l1_address is not null)
         )::text as active_count
     ` as unknown as Promise<{ active_count: string; joined_count: string; exited_count: string }[]>,
+    options.includeParticipantAccounting
+      ? realizedBurntTollFeeRows(channel)
+      : Promise.resolve([{ realized_burnt_toll_fee: "0" }]),
     sql`
       select event_group, count(*)::text as count
       from observer_events
@@ -312,6 +317,7 @@ export async function getObserverDashboard(
       channelParticipantsCount: participantRows[0]?.active_count ?? "0",
       joinedParticipantsCount: participantRows[0]?.joined_count ?? "0",
       exitedParticipantsCount: participantRows[0]?.exited_count ?? "0",
+      realizedBurntTollFee: burntTollRows[0]?.realized_burnt_toll_fee ?? "0",
       eventCounts,
     },
     lists,
@@ -321,6 +327,60 @@ export async function getObserverDashboard(
     },
     listTotals,
   };
+}
+
+async function realizedBurntTollFeeRows(channel: ObserverChannelRow) {
+  const sql = getSql();
+  return sql`
+    with exits as (
+      select
+        lower(decoded->>'l1Address') as l1_address,
+        decoded->>'leafIndex' as leaf_index,
+        block_number,
+        log_index,
+        transaction_hash
+      from observer_events
+      where chain_id = ${channel.chain_id}::bigint
+        and channel_id = ${channel.channel_id}
+        and event_name = 'ChannelTokenVaultIdentityExited'
+    ),
+    matched as (
+      select
+        joined.join_toll_paid,
+        refunded.refund_amount
+      from exits
+      left join lateral (
+        select (decoded->>'joinTollPaid')::numeric as join_toll_paid
+        from observer_events
+        where chain_id = ${channel.chain_id}::bigint
+          and channel_id = ${channel.channel_id}
+          and event_name = 'ChannelTokenVaultIdentityRegistered'
+          and lower(decoded->>'l1Address') = exits.l1_address
+          and decoded->>'leafIndex' = exits.leaf_index
+          and (
+            block_number < exits.block_number
+            or (block_number = exits.block_number and log_index < exits.log_index)
+          )
+        order by block_number desc, log_index desc
+        limit 1
+      ) joined on true
+      left join lateral (
+        select (decoded->>'amount')::numeric as refund_amount
+        from observer_events
+        where chain_id = ${channel.chain_id}::bigint
+          and channel_id = ${channel.channel_id}
+          and event_name = 'ChannelExitRefunded'
+          and transaction_hash = exits.transaction_hash
+          and lower(decoded->>'user') = exits.l1_address
+        order by log_index asc
+        limit 1
+      ) refunded on true
+    )
+    select coalesce(sum(join_toll_paid - refund_amount), 0)::text as realized_burnt_toll_fee
+    from matched
+    where join_toll_paid is not null
+      and refund_amount is not null
+  ` as unknown as Promise<{ realized_burnt_toll_fee: string }[]>;
 }
 
 export async function getObserverEvents(slug: string, filters: { group?: string; event?: string; limit?: number }) {

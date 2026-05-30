@@ -39,6 +39,7 @@ export default async function ObserverChannelSectionPage({
 
   const dashboard = await getObserverDashboard(slug, {
     includeIncidents: section === "notices",
+    includeParticipantAccounting: section === "participants",
     listMode: section === "events" ? "events" : section === "upgrades" ? "upgrades" : "none",
     eventListPages: section === "events" ? eventListPages(resolvedSearchParams) : undefined,
   });
