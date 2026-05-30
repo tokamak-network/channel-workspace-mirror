@@ -31,6 +31,13 @@ export type ObserverChannelRow = {
   bridge_core_implementation: string | null;
   bridge_token_vault_implementation: string | null;
   current_join_toll: string | null;
+  toll_refund_cutoff1_seconds: string | null;
+  toll_refund_cutoff2_seconds: string | null;
+  toll_refund_cutoff3_seconds: string | null;
+  toll_refund_bps1: string | null;
+  toll_refund_bps2: string | null;
+  toll_refund_bps3: string | null;
+  toll_refund_bps4: string | null;
   current_root_vector_hash: string | null;
   current_state_refreshed_at: string | null;
   updated_at: string;
@@ -146,7 +153,7 @@ const DECODED_FIELDS = {
   commitment: ["storageKey"],
   encryptedPayload: ["encryptedNoteValue"],
   privateState: ["rootVectorHash", "storageAddr", "storageKey", "value", "l2Address"],
-  policy: ["previousJoinToll", "newJoinToll"],
+  policy: ["previousJoinToll", "newJoinToll", "cutoff1", "bps1", "cutoff2", "bps2", "cutoff3", "bps3", "bps4"],
   verifier: ["grothVerifier", "tokamakVerifier"],
   admin: ["previousOwner", "newOwner"],
   upgrade: ["implementation"],

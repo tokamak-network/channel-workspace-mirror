@@ -247,6 +247,7 @@ function SectionDetail({
             <InfoItem label="DApp metadata schema" value={channel.dapp_metadata_digest_schema ?? "unknown"} mono />
             <InfoItem label="Current root vector hash" value={channel.current_root_vector_hash ?? "unknown"} mono />
             <InfoItem label="Current join toll (TON)" value={formatTokenAmount(channel.current_join_toll ?? "0")} />
+            <InfoItem label="Toll refund policy" value={<TollRefundPolicy channel={channel} />} />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Source & Artifacts">
@@ -667,6 +668,28 @@ function InfoItem({
   );
 }
 
+function TollRefundPolicy({ channel }: { channel: ObserverChannel }) {
+  const schedule = tollRefundSchedule(channel);
+  if (!schedule) {
+    return "not indexed";
+  }
+  if (schedule === "invalid") {
+    return "invalid policy snapshot";
+  }
+  return (
+    <dl className="toll-policy">
+      {schedule.map((item) => (
+        <div key={item.label}>
+          <dt>{item.label}</dt>
+          <dd>
+            {formatBpsPercent(item.refundBps)} refunded / {formatBpsPercent(10000n - item.refundBps)} burnt
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function EventTable({
   id,
   title,
@@ -938,6 +961,64 @@ function formatTokenAmount(value: string) {
   const fraction = absoluteWei % 10n ** 18n;
   const fractionText = fraction.toString().padStart(18, "0").slice(0, 4).replace(/0+$/, "");
   return fractionText ? `${sign}${whole}.${fractionText}` : `${sign}${whole}`;
+}
+
+function tollRefundSchedule(channel: ObserverChannel) {
+  const cutoff1 = parseOptionalUnsignedInteger(channel.toll_refund_cutoff1_seconds);
+  const cutoff2 = parseOptionalUnsignedInteger(channel.toll_refund_cutoff2_seconds);
+  const cutoff3 = parseOptionalUnsignedInteger(channel.toll_refund_cutoff3_seconds);
+  const bps1 = parseOptionalUnsignedInteger(channel.toll_refund_bps1);
+  const bps2 = parseOptionalUnsignedInteger(channel.toll_refund_bps2);
+  const bps3 = parseOptionalUnsignedInteger(channel.toll_refund_bps3);
+  const bps4 = parseOptionalUnsignedInteger(channel.toll_refund_bps4);
+  if (
+    cutoff1 == null
+    || cutoff2 == null
+    || cutoff3 == null
+    || bps1 == null
+    || bps2 == null
+    || bps3 == null
+    || bps4 == null
+  ) {
+    return null;
+  }
+  if (cutoff1 > cutoff2 || cutoff2 > cutoff3 || bps1 > 10000n || bps2 > 10000n || bps3 > 10000n || bps4 > 10000n) {
+    return "invalid" as const;
+  }
+  return [
+    { label: `Up to ${formatDurationSeconds(cutoff1)}`, refundBps: bps1 },
+    { label: `${formatDurationSeconds(cutoff1)} to ${formatDurationSeconds(cutoff2)}`, refundBps: bps2 },
+    { label: `${formatDurationSeconds(cutoff2)} to ${formatDurationSeconds(cutoff3)}`, refundBps: bps3 },
+    { label: `After ${formatDurationSeconds(cutoff3)}`, refundBps: bps4 },
+  ];
+}
+
+function parseOptionalUnsignedInteger(value: string | null) {
+  if (!value || !/^\d+$/.test(value)) {
+    return null;
+  }
+  return BigInt(value);
+}
+
+function formatDurationSeconds(value: bigint) {
+  const units = [
+    { label: "day", seconds: 86400n },
+    { label: "hour", seconds: 3600n },
+    { label: "minute", seconds: 60n },
+  ] as const;
+  for (const unit of units) {
+    if (value !== 0n && value % unit.seconds === 0n) {
+      const amount = value / unit.seconds;
+      return `${amount.toString()} ${unit.label}${amount === 1n ? "" : "s"}`;
+    }
+  }
+  return `${value.toString()} seconds`;
+}
+
+function formatBpsPercent(value: bigint) {
+  const whole = value / 100n;
+  const fraction = value % 100n;
+  return fraction === 0n ? `${whole.toString()}%` : `${whole.toString()}.${fraction.toString().padStart(2, "0").replace(/0+$/, "")}%`;
 }
 
 function shortHash(value: string) {

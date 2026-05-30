@@ -357,6 +357,28 @@ dd {
   line-height: 1.45;
 }
 
+.toll-policy {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.toll-policy div {
+  display: grid;
+  gap: 2px;
+}
+
+.toll-policy dt,
+.toll-policy dd {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.toll-policy dd {
+  color: #16181d;
+  margin: 0;
+}
+
 .external-link-list {
   display: flex;
   flex-wrap: wrap;

@@ -71,6 +71,7 @@ const TARGETED_EVENTS = [
   { addressKey: "channelManager", eventName: "ChannelTokenVaultIdentityRegistered" },
   { addressKey: "channelManager", eventName: "ChannelTokenVaultIdentityExited" },
   { addressKey: "channelManager", eventName: "JoinTollUpdated" },
+  { addressKey: "channelManager", eventName: "JoinTollRefundScheduleUpdated" },
   { addressKey: "channelManager", eventName: "NoteValueEncrypted" },
   { addressKey: "bridgeTokenVault", eventName: "AssetsFunded" },
   { addressKey: "bridgeTokenVault", eventName: "AssetsClaimed" },
@@ -94,6 +95,13 @@ const currentStateAbi = parseAbi([
   "function functionRoot() view returns (bytes32)",
   "function currentRootVectorHash() view returns (bytes32)",
   "function joinToll() view returns (uint256)",
+  "function joinTollRefundCutoff1() view returns (uint64)",
+  "function joinTollRefundCutoff2() view returns (uint64)",
+  "function joinTollRefundCutoff3() view returns (uint64)",
+  "function joinTollRefundBps1() view returns (uint16)",
+  "function joinTollRefundBps2() view returns (uint16)",
+  "function joinTollRefundBps3() view returns (uint16)",
+  "function joinTollRefundBps4() view returns (uint16)",
   "function grothVerifierCompatibleBackendVersion() view returns (string)",
   "function tokamakVerifierCompatibleBackendVersion() view returns (string)",
   "function getDAppInfo(uint256 dappId) view returns ((bool exists,bytes32 labelHash,uint256 channelTokenVaultTreeIndex,bytes32 metadataDigestSchema,bytes32 metadataDigest,bytes32 functionRoot))",
@@ -263,16 +271,30 @@ async function refreshChannelCurrentState(
     channelFunctionRoot,
     currentRootVectorHash,
     currentJoinToll,
+    tollRefundCutoff1,
+    tollRefundCutoff2,
+    tollRefundCutoff3,
+    tollRefundBps1,
+    tollRefundBps2,
+    tollRefundBps3,
+    tollRefundBps4,
     dAppInfo,
     dAppVerifierSnapshot,
   ] = await Promise.all([
-    readBigInt(client, limiter, channel.channelManager, "dappId"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "dappId"),
     readAddress(client, limiter, channel.channelManager, "bridgeTokenVault"),
     readHexString(client, limiter, channel.channelManager, "dappMetadataDigestSchema"),
     readHexString(client, limiter, channel.channelManager, "dappMetadataDigest"),
     readHexString(client, limiter, channel.channelManager, "functionRoot"),
     readHexString(client, limiter, channel.channelManager, "currentRootVectorHash"),
-    readBigInt(client, limiter, channel.channelManager, "joinToll"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinToll"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundCutoff1"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundCutoff2"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundCutoff3"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundBps1"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundBps2"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundBps3"),
+    readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundBps4"),
     readDAppInfo(client, limiter, channel.dAppManager, dappId),
     readDAppVerifierSnapshot(client, limiter, channel.dAppManager, dappId),
   ]);
@@ -324,6 +346,13 @@ async function refreshChannelCurrentState(
       bridge_core_implementation = ${bridgeCoreImplementation},
       bridge_token_vault_implementation = ${bridgeTokenVaultImplementation},
       current_join_toll = ${currentJoinToll.toString()},
+      toll_refund_cutoff1_seconds = ${tollRefundCutoff1.toString()},
+      toll_refund_cutoff2_seconds = ${tollRefundCutoff2.toString()},
+      toll_refund_cutoff3_seconds = ${tollRefundCutoff3.toString()},
+      toll_refund_bps1 = ${tollRefundBps1.toString()},
+      toll_refund_bps2 = ${tollRefundBps2.toString()},
+      toll_refund_bps3 = ${tollRefundBps3.toString()},
+      toll_refund_bps4 = ${tollRefundBps4.toString()},
       current_root_vector_hash = ${currentRootVectorHash},
       current_state_refreshed_at = now(),
       updated_at = now()
@@ -370,7 +399,7 @@ async function readHexString(
   return value;
 }
 
-async function readBigInt(
+async function readUnsignedInteger(
   client: ReturnType<typeof createPublicClient>,
   limiter: RpcRateLimiter,
   address: Address,
@@ -383,10 +412,13 @@ async function readBigInt(
     functionName,
     args,
   } as any));
-  if (typeof value !== "bigint") {
-    throw new Error(`RPC ${functionName} did not return a uint256.`);
+  if (typeof value === "bigint") {
+    return value;
   }
-  return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return BigInt(value);
+  }
+  throw new Error(`RPC ${functionName} did not return an unsigned integer.`);
 }
 
 async function readDAppInfo(
