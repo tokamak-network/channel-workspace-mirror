@@ -25,6 +25,8 @@ Create `/etc/channel-workspace-mirror.env` on the EC2 host with:
 DATABASE_URL=postgresql://...
 BLOB_READ_WRITE_TOKEN=...
 ADMIN_TOKEN=...
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
 APP_REPO_URL=https://github.com/<owner>/<repo>.git
 APP_BRANCH=main
 NODE_MAJOR=22
@@ -32,6 +34,10 @@ NODE_MAJOR=22
 
 The runtime RPC URL and RPC limits are not stored in this file. They are read from Neon through the
 admin-config API and used by `npm run indexer:run`.
+
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required for mirror upload failure alerts. The
+worker sends an alert when a mirror publish run is due but fails before a mirror upload is recorded.
+Telegram delivery failures are logged, but they do not replace the original worker failure.
 
 ## Install
 

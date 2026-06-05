@@ -13,6 +13,7 @@ import { validateMirrorUploadDirectory } from "../lib/manifest";
 import { publishMirrorUpload } from "../lib/publish";
 import { DEFAULT_OBSERVER_CHANNEL } from "../lib/observer/config";
 import { resetObserverAccumulatedScan, syncObserverChannel } from "../lib/observer/sync";
+import { notifyMirrorUploadFailure, type MirrorFailureStage } from "../lib/telegram";
 
 loadLocalEnv();
 
@@ -43,10 +44,13 @@ async function main() {
   const now = new Date();
   const mirrorDue = isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
   let phase: IndexerPhase = mirrorDue ? "mirror" : "observer";
+  let mirrorFailureStage: MirrorFailureStage = "configure_cli";
+  let checkpointBlock: string | number | null = null;
 
   try {
     const mirrorPublish = mirrorDue ? mirrorPublishOptions(channel.name, config.mirror_publish_account) : null;
     await configurePrivateStateCli(config);
+    mirrorFailureStage = "recover_workspace";
     const localWorkspaceRecovered = hasLocalRecoveredWorkspace(channel.name);
     if (mirrorPublish) {
       await updateIndexerRunState(channel.slug, { mirrorRunAt: now });
@@ -64,6 +68,7 @@ async function main() {
     const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
     const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
     await updateIndexerRunState(channel.slug, { observerRunAt: now, rawHistoryDir });
+    mirrorFailureStage = "observer_sync";
     const observer = await syncObserverChannel(channel, {
       rpcUrl: config.rpc_url,
       rawHistoryDir,
@@ -79,7 +84,9 @@ async function main() {
     let mirror = null;
     if (mirrorPublish) {
       phase = "mirror";
+      mirrorFailureStage = "upload";
       mirror = await uploadMirrorOutput(mirrorPublish.outputDir);
+      checkpointBlock = mirror.checkpointBlock;
       await updateIndexerRunState(channel.slug, {
         mirrorSuccessAt: new Date(),
         rawHistoryDir,
@@ -98,9 +105,25 @@ async function main() {
     }, null, 2));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await updateIndexerRunState(channel.slug, {
-      ...(phase === "mirror" ? { mirrorError: message } : { observerError: message }),
-    });
+    try {
+      await updateIndexerRunState(channel.slug, {
+        ...(phase === "mirror" ? { mirrorError: message } : { observerError: message }),
+      });
+    } catch (stateError) {
+      console.error(`Indexer failure state update failed: ${stateError instanceof Error ? stateError.message : String(stateError)}`);
+    }
+    if (phase === "mirror") {
+      await notifyMirrorUploadFailure({
+        channelName: channel.name,
+        channelSlug: channel.slug,
+        errorMessage: message,
+        occurredAt: new Date(),
+        stage: mirrorFailureStage,
+        lastMirrorSuccessAt: state?.last_mirror_success_at ?? null,
+        checkpointBlock,
+        workerHost: os.hostname(),
+      });
+    }
     throw error;
   }
 }
