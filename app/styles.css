@@ -129,6 +129,21 @@ dd {
   padding: 15px;
 }
 
+.data-issue-notice {
+  max-width: none;
+  border: 1px solid #d9dde5;
+  border-left: 5px solid #6b7280;
+  background: #ffffff;
+  border-radius: 8px;
+  color: #303846;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+}
+
+.data-issue-notice p {
+  font-size: 14px;
+}
+
 .event-count-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

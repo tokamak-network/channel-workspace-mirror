@@ -98,6 +98,8 @@ export type ObserverDashboard = {
     lastScannedBlock: string | null;
     latestBlock: string | null;
     updatedAt: string | null;
+    status: "ok" | "issue";
+    message: string | null;
   };
   stats: {
     channelCreated: ObserverEventRow | null;
@@ -180,7 +182,7 @@ export async function getObserverDashboard(
   }
 
   const sql = getSql();
-  const [syncRows, channelCreatedRows, latestTransitions, totals, participantRows, burntTollRows, countRows] = await Promise.all([
+  const [syncRows, phaseRows, channelCreatedRows, latestTransitions, totals, participantRows, burntTollRows, countRows] = await Promise.all([
     sql`
       select last_scanned_block, latest_block, updated_at
       from observer_sync_state
@@ -188,6 +190,11 @@ export async function getObserverDashboard(
         and channel_id = ${channel.channel_id}
       limit 1
     ` as unknown as Promise<{ last_scanned_block: string; latest_block: string | null; updated_at: string }[]>,
+    sql`
+      select phase, status
+      from indexer_phase_state
+      where channel_slug = ${channel.slug}
+    ` as unknown as Promise<{ phase: string; status: string }[]>,
     eventRows(channel, { eventName: "ChannelCreated", decodedFields: DECODED_FIELDS.channelCreated, limit: 1, sort: "asc" }),
     eventRows(channel, { eventName: "CurrentRootVectorObserved", decodedFields: DECODED_FIELDS.transition, limit: 1 }),
     sql`
@@ -308,6 +315,7 @@ export async function getObserverDashboard(
   for (const row of countRows) {
     eventCounts[row.event_group] = row.count;
   }
+  const hasDataIssue = syncRows.length === 0 || phaseRows.some((row) => row.status === "failed");
 
   return {
     channel,
@@ -315,6 +323,8 @@ export async function getObserverDashboard(
       lastScannedBlock: syncRows[0]?.last_scanned_block ?? null,
       latestBlock: syncRows[0]?.latest_block ?? null,
       updatedAt: syncRows[0]?.updated_at ?? null,
+      status: hasDataIssue ? "issue" : "ok",
+      message: hasDataIssue ? "Observer data is currently unavailable." : null,
     },
     stats: {
       channelCreated: channelCreatedRows[0] ?? null,

@@ -13,6 +13,7 @@
     "upload:local": "tsx scripts/upload-local.ts",
     "observer:sync": "tsx scripts/sync-observer.ts",
     "indexer:run": "tsx scripts/run-indexer.ts",
+    "rpc:probe-logs": "tsx scripts/probe-rpc-logs.ts",
     "cleanup:dry-run": "tsx scripts/cleanup.ts"
   },
   "dependencies": {

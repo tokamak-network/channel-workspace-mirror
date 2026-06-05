@@ -12,6 +12,7 @@ import {
 import { observerAbi, eventGroupFor } from "./abi";
 import { DEFAULT_OBSERVER_CHANNEL, type ObserverChannelConfig } from "./config";
 import { requireIndexerRuntimeConfig } from "../indexer/config";
+import { updateIndexerPhaseState } from "../indexer/phase-state";
 import { getSql } from "../db";
 
 type SyncResult = {
@@ -132,18 +133,88 @@ export async function syncObserverChannel(
   });
   const limiter = createRpcRateLimiter(options.logRequestsPerSecond);
   const latestBlock = await limitedRpc(limiter, () => client.getBlockNumber());
-  await refreshChannelCurrentState(channel, client, limiter);
-
-  const rawImported = options.rawHistoryDir
-    ? await importRawRpcCallHistory({ channel, client, limiter, historyDir: options.rawHistoryDir })
-    : 0;
-  const targetedInsertedOrUpdated = await syncTargetedEvents({
-    channel,
-    client,
-    limiter,
+  await updateIndexerPhaseState(channel.slug, "current_state_refresh", {
+    status: "running",
+    startedAt: new Date(),
     latestBlock,
-    blockRangeCap: BigInt(options.blockRangeCap),
+    lastError: null,
   });
+  try {
+    await refreshChannelCurrentState(channel, client, limiter);
+    await updateIndexerPhaseState(channel.slug, "current_state_refresh", {
+      status: "succeeded",
+      succeededAt: new Date(),
+      latestBlock,
+      lastError: null,
+    });
+  } catch (error) {
+    await updateIndexerPhaseState(channel.slug, "current_state_refresh", {
+      status: "failed",
+      failedAt: new Date(),
+      latestBlock,
+      lastError: errorMessage(error),
+    });
+    throw error;
+  }
+
+  await updateIndexerPhaseState(channel.slug, "raw_history_import", {
+    status: options.rawHistoryDir ? "running" : "skipped",
+    startedAt: new Date(),
+    latestBlock,
+    lastError: null,
+  });
+  let rawImported = 0;
+  if (options.rawHistoryDir) {
+    try {
+      rawImported = await importRawRpcCallHistory({ channel, client, limiter, historyDir: options.rawHistoryDir });
+      await updateIndexerPhaseState(channel.slug, "raw_history_import", {
+        status: "succeeded",
+        succeededAt: new Date(),
+        latestBlock,
+        lastError: null,
+      });
+    } catch (error) {
+      await updateIndexerPhaseState(channel.slug, "raw_history_import", {
+        status: "failed",
+        failedAt: new Date(),
+        latestBlock,
+        lastError: errorMessage(error),
+      });
+      throw error;
+    }
+  }
+
+  await updateIndexerPhaseState(channel.slug, "targeted_event_sync", {
+    status: "running",
+    startedAt: new Date(),
+    latestBlock,
+    lastError: null,
+  });
+  let targetedInsertedOrUpdated = 0;
+  try {
+    targetedInsertedOrUpdated = await syncTargetedEvents({
+      channel,
+      client,
+      limiter,
+      latestBlock,
+      blockRangeCap: BigInt(options.blockRangeCap),
+    });
+    await updateIndexerPhaseState(channel.slug, "targeted_event_sync", {
+      status: "succeeded",
+      succeededAt: new Date(),
+      latestBlock,
+      lastScannedBlock: latestBlock,
+      lastError: null,
+    });
+  } catch (error) {
+    await updateIndexerPhaseState(channel.slug, "targeted_event_sync", {
+      status: "failed",
+      failedAt: new Date(),
+      latestBlock,
+      lastError: errorMessage(error),
+    });
+    throw error;
+  }
 
   await updateSummarySyncState(channel, latestBlock, latestBlock);
   await sql`select 1`;
@@ -1031,6 +1102,10 @@ function normalizeHexString(value: unknown) {
 
 function minBigInt(left: bigint, right: bigint) {
   return left < right ? left : right;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function zeroAddress() {

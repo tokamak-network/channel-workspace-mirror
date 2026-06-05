@@ -58,13 +58,16 @@ export function isObserverSection(value: string): value is SectionId {
 
 export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }) {
   const { channel, sync, stats } = dashboard;
-  const latestBlock = stats.latestAcceptedTransition?.block_number ?? "none";
-  const totalEvents = displayedEventCount(stats.eventCounts);
+  const hasDataIssue = sync.status === "issue";
+  const unavailable = "Unavailable";
+  const latestBlock = hasDataIssue ? unavailable : stats.latestAcceptedTransition?.block_number ?? "none";
+  const totalEvents = hasDataIssue ? unavailable : displayedEventCount(stats.eventCounts);
 
   return (
     <main className="observer-shell">
       <ObserverHeader dashboard={dashboard} />
       <ObserverNav channelSlug={dashboard.channel.slug} />
+      {hasDataIssue ? <DataIssueNotice message={sync.message} /> : null}
 
       <section className="overview-panel" aria-label="Channel overview">
         <div className="overview-primary">
@@ -75,17 +78,17 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
           </p>
         </div>
         <dl className="summary-list">
-          <InfoItem label="Sync height" value={sync.lastScannedBlock ?? "not synced"} />
-          <InfoItem label="Latest L1 height" value={sync.latestBlock ?? "not synced"} />
-          <InfoItem label="Last indexed" value={formatDate(sync.updatedAt)} />
+          <InfoItem label="Sync height" value={hasDataIssue ? unavailable : sync.lastScannedBlock ?? "not synced"} />
+          <InfoItem label="Latest L1 height" value={hasDataIssue ? unavailable : sync.latestBlock ?? "not synced"} />
+          <InfoItem label="Last indexed" value={hasDataIssue ? unavailable : formatDate(sync.updatedAt)} />
           <InfoItem label="Latest transition" value={latestBlock} />
         </dl>
       </section>
 
       <section className="metric-grid" aria-label="Channel metrics">
-        <Metric label="Bridge deposits (TON)" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
-        <Metric label="Bridge withdrawals (TON)" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
-        <Metric label="Active participants" value={stats.channelParticipantsCount} />
+        <Metric label="Bridge deposits (TON)" value={hasDataIssue ? unavailable : formatTokenAmount(stats.totalL1BridgeDeposits)} />
+        <Metric label="Bridge withdrawals (TON)" value={hasDataIssue ? unavailable : formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
+        <Metric label="Active participants" value={hasDataIssue ? unavailable : stats.channelParticipantsCount} />
         <Metric label="Indexed events" value={totalEvents} />
       </section>
 
@@ -95,16 +98,16 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
           <InfoItem label="DApp ID" value={channel.dapp_id} mono />
         </OverviewBlock>
         <OverviewBlock title="Bridge Status" href={`/observer/${channel.slug}/bridge`}>
-          <InfoItem label="Deposits (TON)" value={formatTokenAmount(stats.totalL1BridgeDeposits)} />
-          <InfoItem label="Withdrawals (TON)" value={formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
+          <InfoItem label="Deposits (TON)" value={hasDataIssue ? unavailable : formatTokenAmount(stats.totalL1BridgeDeposits)} />
+          <InfoItem label="Withdrawals (TON)" value={hasDataIssue ? unavailable : formatTokenAmount(stats.totalL1BridgeWithdrawals)} />
         </OverviewBlock>
         <OverviewBlock title="Participants" href={`/observer/${channel.slug}/participants`}>
-          <InfoItem label="Active" value={stats.channelParticipantsCount} />
-          <InfoItem label="Joined" value={stats.joinedParticipantsCount} />
+          <InfoItem label="Active" value={hasDataIssue ? unavailable : stats.channelParticipantsCount} />
+          <InfoItem label="Joined" value={hasDataIssue ? unavailable : stats.joinedParticipantsCount} />
         </OverviewBlock>
         <OverviewBlock title="Event Logs" href={`/observer/${channel.slug}/events`}>
-          <InfoItem label="Displayed events" value={displayedEventCount(stats.eventCounts)} />
-          <InfoItem label="Event groups" value={displayedEventGroupCount(stats.eventCounts)} />
+          <InfoItem label="Displayed events" value={hasDataIssue ? unavailable : displayedEventCount(stats.eventCounts)} />
+          <InfoItem label="Event groups" value={hasDataIssue ? unavailable : displayedEventGroupCount(stats.eventCounts)} />
         </OverviewBlock>
         <OverviewBlock title="Upgrade History" href={`/observer/${channel.slug}/upgrades`}>
           <InfoItem label="Tokamak verifier" value={channel.tokamak_verifier ?? "unknown"} mono />
@@ -112,7 +115,7 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
         </OverviewBlock>
         <OverviewBlock title="Notices" href={`/observer/${channel.slug}/notices`}>
           <InfoItem label="Active incidents" value={activeIncidentLabel(dashboard.incidents.active.length)} />
-          <InfoItem label="Last indexed" value={formatDate(sync.updatedAt)} />
+          <InfoItem label="Last indexed" value={hasDataIssue ? unavailable : formatDate(sync.updatedAt)} />
         </OverviewBlock>
       </section>
     </main>
@@ -161,6 +164,7 @@ function ObserverHeader({
   dashboard: ObserverDashboard;
 }) {
   const { channel, sync } = dashboard;
+  const hasDataIssue = sync.status === "issue";
   return (
     <header className="observer-header">
       <div>
@@ -169,9 +173,9 @@ function ObserverHeader({
         <p className="lede">Public evidence for channel users, operators, and oversight reviewers.</p>
       </div>
       <dl className="status-strip" aria-label="Sync status">
-        <InfoItem label="Scanned" value={sync.lastScannedBlock ?? "not synced"} />
-        <InfoItem label="Latest L1" value={sync.latestBlock ?? "not synced"} />
-        <InfoItem label="Updated" value={formatDate(sync.updatedAt)} />
+        <InfoItem label="Scanned" value={hasDataIssue ? "Unavailable" : sync.lastScannedBlock ?? "not synced"} />
+        <InfoItem label="Latest L1" value={hasDataIssue ? "Unavailable" : sync.latestBlock ?? "not synced"} />
+        <InfoItem label="Updated" value={hasDataIssue ? "Unavailable" : formatDate(sync.updatedAt)} />
       </dl>
     </header>
   );
@@ -215,8 +219,13 @@ function SectionDetail({
   npmPackageVersion: string | null;
 }) {
   const { channel, stats, lists } = dashboard;
+  const hasDataIssue = dashboard.sync.status === "issue";
   const verifierVersion = `Tokamak ${channel.tokamak_verifier_version ?? "unknown"} / Groth16 ${channel.groth_verifier_version ?? "unknown"}`;
   const eventPagePath = `/observer/${channel.slug}/events`;
+
+  if (hasDataIssue && isObserverDataSection(sectionId)) {
+    return <DataIssueNotice message={dashboard.sync.message} />;
+  }
 
   if (sectionId === "channel") {
     return (
@@ -524,9 +533,9 @@ function SectionDetail({
       </DetailSection>
       <DetailSection title="Monitoring Status">
         <InfoGrid>
-          <InfoItem label="Last observer sync" value={formatDate(dashboard.sync.updatedAt)} />
-          <InfoItem label="Latest scanned block" value={dashboard.sync.lastScannedBlock ?? "not synced"} />
-          <InfoItem label="Latest L1 block" value={dashboard.sync.latestBlock ?? "not synced"} />
+          <InfoItem label="Last observer sync" value={hasDataIssue ? "Unavailable" : formatDate(dashboard.sync.updatedAt)} />
+          <InfoItem label="Latest scanned block" value={hasDataIssue ? "Unavailable" : dashboard.sync.lastScannedBlock ?? "not synced"} />
+          <InfoItem label="Latest L1 block" value={hasDataIssue ? "Unavailable" : dashboard.sync.latestBlock ?? "not synced"} />
         </InfoGrid>
       </DetailSection>
       <DetailSection title="Public Data Scope">
@@ -594,6 +603,14 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function DataIssueNotice({ message }: { message?: string | null }) {
+  return (
+    <section className="data-issue-notice" role="status">
+      <p>{message ?? "Observer data is currently unavailable."}</p>
+    </section>
   );
 }
 
@@ -1082,6 +1099,10 @@ function formatDecodedValue(key: string, value: unknown): ReactNode {
   }
   const json = JSON.stringify(value);
   return json.length > 120 ? `${json.slice(0, 117)}...` : json;
+}
+
+function isObserverDataSection(sectionId: SectionId) {
+  return sectionId === "bridge" || sectionId === "participants" || sectionId === "events" || sectionId === "upgrades";
 }
 
 function activeIncidentLabel(count: number) {

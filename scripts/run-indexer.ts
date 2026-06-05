@@ -9,6 +9,7 @@ import {
   requireIndexerRuntimeConfig,
   updateIndexerRunState,
 } from "../lib/indexer/config";
+import { updateIndexerPhaseState } from "../lib/indexer/phase-state";
 import { validateMirrorUploadDirectory } from "../lib/manifest";
 import { publishMirrorUpload } from "../lib/publish";
 import { DEFAULT_OBSERVER_CHANNEL } from "../lib/observer/config";
@@ -54,6 +55,11 @@ async function main() {
     const localWorkspaceRecovered = hasLocalRecoveredWorkspace(channel.name);
     if (mirrorPublish) {
       await updateIndexerRunState(channel.slug, { mirrorRunAt: now });
+      await updateIndexerPhaseState(channel.slug, "mirror_publish", {
+        status: "running",
+        startedAt: now,
+        lastError: null,
+      });
     }
     const recovery = recoverWorkspace({
       channelName: channel.name,
@@ -93,6 +99,12 @@ async function main() {
         checkpointBlock: mirror.checkpointBlock,
         mirrorError: null,
       });
+      await updateIndexerPhaseState(channel.slug, "mirror_publish", {
+        status: "succeeded",
+        succeededAt: new Date(),
+        checkpointBlock: mirror.checkpointBlock,
+        lastError: null,
+      });
     }
 
     console.log(JSON.stringify({
@@ -113,6 +125,16 @@ async function main() {
       console.error(`Indexer failure state update failed: ${stateError instanceof Error ? stateError.message : String(stateError)}`);
     }
     if (phase === "mirror") {
+      try {
+        await updateIndexerPhaseState(channel.slug, "mirror_publish", {
+          status: "failed",
+          failedAt: new Date(),
+          checkpointBlock,
+          lastError: message,
+        });
+      } catch (phaseStateError) {
+        console.error(`Mirror failure phase state update failed: ${phaseStateError instanceof Error ? phaseStateError.message : String(phaseStateError)}`);
+      }
       await notifyMirrorUploadFailure({
         channelName: channel.name,
         channelSlug: channel.slug,
