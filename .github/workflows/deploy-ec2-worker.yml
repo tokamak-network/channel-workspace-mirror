@@ -1,0 +1,75 @@
+name: Deploy EC2 worker
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ec2-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Prepare SSH key
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2_worker_key
+          chmod 600 ~/.ssh/ec2_worker_key
+
+      - name: Authorize runner SSH
+        id: ssh_ingress
+        run: |
+          set -euo pipefail
+          runner_ip="$(curl -fsS https://api.ipify.org)"
+          cidr="${runner_ip}/32"
+          echo "cidr=${cidr}" >> "$GITHUB_OUTPUT"
+          rule_id="$(aws ec2 authorize-security-group-ingress \
+            --group-id "${{ vars.EC2_SECURITY_GROUP_ID }}" \
+            --ip-permissions "[{\"IpProtocol\":\"tcp\",\"FromPort\":${{ vars.EC2_PORT }},\"ToPort\":${{ vars.EC2_PORT }},\"IpRanges\":[{\"CidrIp\":\"${cidr}\",\"Description\":\"github-actions-${{ github.run_id }}\"}]}]" \
+            --query 'SecurityGroupRules[0].SecurityGroupRuleId' \
+            --output text)"
+          echo "rule_id=${rule_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy worker
+        run: |
+          set -euo pipefail
+          ssh-keyscan -p "${{ vars.EC2_PORT }}" "${{ vars.EC2_HOST }}" >> ~/.ssh/known_hosts
+          scp -P "${{ vars.EC2_PORT }}" -i ~/.ssh/ec2_worker_key ops/aws-worker/update-worker.sh "${{ vars.EC2_USER }}@${{ vars.EC2_HOST }}:/tmp/channel-workspace-mirror-update-worker.sh"
+          ssh -p "${{ vars.EC2_PORT }}" -i ~/.ssh/ec2_worker_key "${{ vars.EC2_USER }}@${{ vars.EC2_HOST }}" \
+            'sudo bash /tmp/channel-workspace-mirror-update-worker.sh && rm -f /tmp/channel-workspace-mirror-update-worker.sh'
+
+      - name: Verify worker drift controls
+        run: |
+          set -euo pipefail
+          ssh -p "${{ vars.EC2_PORT }}" -i ~/.ssh/ec2_worker_key "${{ vars.EC2_USER }}@${{ vars.EC2_HOST }}" '
+            set -euo pipefail
+            systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnUnitInactiveSec=5min"
+            ! systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnBootSec"
+            test "$(stat -c "%U:%G" /opt/channel-workspace-mirror)" = "channelmirror:channelmirror"
+          '
+
+      - name: Revoke runner SSH
+        if: always() && steps.ssh_ingress.outputs.rule_id != ''
+        run: |
+          set -euo pipefail
+          aws ec2 revoke-security-group-ingress \
+            --group-id "${{ vars.EC2_SECURITY_GROUP_ID }}" \
+            --security-group-rule-ids "${{ steps.ssh_ingress.outputs.rule_id }}"

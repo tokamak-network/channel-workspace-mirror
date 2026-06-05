@@ -11,7 +11,7 @@ import {
 } from "viem";
 import { observerAbi, eventGroupFor } from "./abi";
 import { DEFAULT_OBSERVER_CHANNEL, type ObserverChannelConfig } from "./config";
-import { requireIndexerRuntimeConfig } from "../indexer/config";
+import { effectiveObserverRpcTimeoutMs, requireIndexerRuntimeConfig } from "../indexer/config";
 import { updateIndexerPhaseState } from "../indexer/phase-state";
 import { getSql } from "../db";
 
@@ -27,6 +27,7 @@ type ObserverSyncOptions = {
   rawHistoryDir?: string | null;
   blockRangeCap: number;
   logRequestsPerSecond: number;
+  rpcTimeoutMs: number;
 };
 
 type DecodedObserverLog = {
@@ -113,11 +114,13 @@ export async function syncDefaultObserverChannel(rawHistoryDir?: string | null):
   const runtime = await requireIndexerRuntimeConfig(DEFAULT_OBSERVER_CHANNEL.slug);
   const logRequestsPerSecond = requiredPositiveNumber(runtime.log_requests_per_second, "log_requests_per_second");
   const blockRangeCap = requiredPositiveInteger(runtime.block_range_cap, "block_range_cap");
+  const rpcTimeoutMs = effectiveObserverRpcTimeoutMs(runtime);
   return syncObserverChannel(DEFAULT_OBSERVER_CHANNEL, {
     rpcUrl: runtime.rpc_url,
     rawHistoryDir,
     blockRangeCap,
     logRequestsPerSecond,
+    rpcTimeoutMs,
   });
 }
 
@@ -129,7 +132,7 @@ export async function syncObserverChannel(
   await upsertChannel(channel);
 
   const client = createPublicClient({
-    transport: http(options.rpcUrl),
+    transport: http(options.rpcUrl, { timeout: options.rpcTimeoutMs }),
   });
   const limiter = createRpcRateLimiter(options.logRequestsPerSecond);
   const latestBlock = await limitedRpc(limiter, () => client.getBlockNumber());

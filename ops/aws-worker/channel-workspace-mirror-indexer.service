@@ -1,0 +1,22 @@
+[Unit]
+Description=Channel workspace mirror indexer
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=channelmirror
+Group=channelmirror
+WorkingDirectory=/opt/channel-workspace-mirror
+EnvironmentFile=/etc/channel-workspace-mirror.env
+Environment=HOME=/var/lib/channel-workspace-mirror
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/npm run indexer:run
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+TimeoutStartSec=12h
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/channel-workspace-mirror /var/lib/channel-workspace-mirror /tmp

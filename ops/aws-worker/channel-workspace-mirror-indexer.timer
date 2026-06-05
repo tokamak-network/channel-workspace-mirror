@@ -1,0 +1,9 @@
+[Unit]
+Description=Run channel workspace mirror indexer every five minutes
+
+[Timer]
+OnUnitInactiveSec=5min
+Unit=channel-workspace-mirror-indexer.service
+
+[Install]
+WantedBy=timers.target

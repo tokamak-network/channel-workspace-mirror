@@ -22,6 +22,7 @@ create table if not exists indexer_runtime_config (
   rpc_url text,
   log_requests_per_second numeric,
   block_range_cap integer,
+  observer_rpc_timeout_ms integer not null default 120000,
   mirror_publish_interval_seconds integer not null default 86400,
   observer_batch_size integer not null default 2000,
   mirror_publish_account text,
@@ -29,6 +30,8 @@ create table if not exists indexer_runtime_config (
   created_at timestamptz not null default now(),
   constraint indexer_runtime_config_mirror_interval_positive
     check (mirror_publish_interval_seconds > 0),
+  constraint indexer_runtime_config_observer_rpc_timeout_positive
+    check (observer_rpc_timeout_ms > 0),
   constraint indexer_runtime_config_batch_size_positive
     check (observer_batch_size > 0)
 );

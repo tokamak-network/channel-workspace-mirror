@@ -150,12 +150,13 @@ The first worker run on a persistent host performs `recover-workspace --from-gen
 when the local CLI workspace has no recovered channel snapshot yet. Later runs use that host's CLI
 recovery index and append only new raw RPC history.
 
-Observer RPC calls use only the RPC scan parameters imported from the private-state CLI
-`rpc-config.env`. `LOG_REQUESTS_PER_SECOND` is applied to observer `eth_blockNumber`,
-`eth_getLogs`, and `eth_getBlockByNumber` calls, and every observer `eth_getLogs` request scans
-exactly one `RPC_BLOCK_RANGE_CAP` block window except for the final shorter tail range. The observer
-does not keep a separate confirmation-depth setting. If the CLI detects that incremental recovery is
-not trustworthy, the worker retries recovery from genesis and resets accumulated observer scan state.
+Observer RPC calls use the RPC URL and scan parameters from `indexer_runtime_config`.
+`LOG_REQUESTS_PER_SECOND` is applied to observer `eth_blockNumber`, `eth_getLogs`, and
+`eth_getBlockByNumber` calls, and every observer `eth_getLogs` request scans exactly one
+`RPC_BLOCK_RANGE_CAP` block window except for the final shorter tail range. Observer RPC calls use
+the configured `observer_rpc_timeout_ms` value, which defaults to 120000 ms. The observer does not
+keep a separate confirmation-depth setting. If the CLI detects that incremental recovery is not
+trustworthy, the worker retries recovery from genesis and resets accumulated observer scan state.
 
 ## Persistent Worker
 

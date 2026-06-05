@@ -5,6 +5,7 @@ export type IndexerRuntimeConfig = {
   rpc_url: string | null;
   log_requests_per_second: string | null;
   block_range_cap: number | null;
+  observer_rpc_timeout_ms: number | null;
   mirror_publish_interval_seconds: number;
   mirror_publish_account: string | null;
   updated_at: string;
@@ -29,9 +30,12 @@ export type IndexerRuntimeConfigInput = {
   rpcUrl?: string | null;
   logRequestsPerSecond?: number | null;
   blockRangeCap?: number | null;
+  observerRpcTimeoutMs?: number | null;
   mirrorPublishIntervalSeconds?: number;
   mirrorPublishAccount?: string | null;
 };
+
+export const DEFAULT_OBSERVER_RPC_TIMEOUT_MS = 120_000;
 
 export async function getIndexerRuntimeConfig(channelSlug: string) {
   const sql = getSql();
@@ -64,6 +68,7 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       rpc_url,
       log_requests_per_second,
       block_range_cap,
+      observer_rpc_timeout_ms,
       mirror_publish_interval_seconds,
       mirror_publish_account,
       updated_at
@@ -73,6 +78,7 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       ${input.rpcUrl ?? null},
       ${input.logRequestsPerSecond == null ? null : String(input.logRequestsPerSecond)}::numeric,
       ${input.blockRangeCap == null ? null : String(input.blockRangeCap)}::integer,
+      ${String(input.observerRpcTimeoutMs ?? defaultObserverRpcTimeoutMs())}::integer,
       ${String(input.mirrorPublishIntervalSeconds ?? 86400)}::integer,
       ${input.mirrorPublishAccount ?? null},
       now()
@@ -81,6 +87,7 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       rpc_url = excluded.rpc_url,
       log_requests_per_second = excluded.log_requests_per_second,
       block_range_cap = excluded.block_range_cap,
+      observer_rpc_timeout_ms = excluded.observer_rpc_timeout_ms,
       mirror_publish_interval_seconds = excluded.mirror_publish_interval_seconds,
       mirror_publish_account = excluded.mirror_publish_account,
       updated_at = now()
@@ -186,9 +193,25 @@ export function isDue(lastRunAt: string | null, intervalSeconds: number, now = n
   return now.getTime() - lastRunMs >= intervalSeconds * 1000;
 }
 
+export function effectiveObserverRpcTimeoutMs(config: Pick<IndexerRuntimeConfig, "observer_rpc_timeout_ms">) {
+  return assertPositiveInteger(
+    config.observer_rpc_timeout_ms ?? defaultObserverRpcTimeoutMs(),
+    "observer_rpc_timeout_ms",
+  );
+}
+
+export function defaultObserverRpcTimeoutMs() {
+  const value = process.env.OBSERVER_RPC_TIMEOUT_MS;
+  if (value == null || value.trim() === "") {
+    return DEFAULT_OBSERVER_RPC_TIMEOUT_MS;
+  }
+  return assertPositiveInteger(Number(value), "OBSERVER_RPC_TIMEOUT_MS");
+}
+
 function validateConfigInput(input: IndexerRuntimeConfigInput) {
   assertOptionalPositiveInteger(input.mirrorPublishIntervalSeconds, "mirrorPublishIntervalSeconds");
   assertOptionalPositiveInteger(input.blockRangeCap, "blockRangeCap");
+  assertOptionalPositiveInteger(input.observerRpcTimeoutMs, "observerRpcTimeoutMs");
   if (input.logRequestsPerSecond != null && (!Number.isFinite(input.logRequestsPerSecond) || input.logRequestsPerSecond <= 0)) {
     throw new Error("logRequestsPerSecond must be a positive number.");
   }
@@ -201,4 +224,11 @@ function assertOptionalPositiveInteger(value: number | undefined | null, name: s
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
   }
+}
+
+function assertPositiveInteger(value: number, name: string) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+  return value;
 }

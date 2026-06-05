@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { loadLocalEnv } from "../lib/env";
 import {
+  effectiveObserverRpcTimeoutMs,
   getIndexerRunState,
   isDue,
   requireIndexerRuntimeConfig,
@@ -73,6 +74,7 @@ async function main() {
     }
     const logRequestsPerSecond = requiredPositiveNumber(config.log_requests_per_second, "log_requests_per_second");
     const blockRangeCap = requiredPositiveInteger(config.block_range_cap, "block_range_cap");
+    const rpcTimeoutMs = effectiveObserverRpcTimeoutMs(config);
     await updateIndexerRunState(channel.slug, { observerRunAt: now, rawHistoryDir });
     mirrorFailureStage = "observer_sync";
     const observer = await syncObserverChannel(channel, {
@@ -80,6 +82,7 @@ async function main() {
       rawHistoryDir,
       blockRangeCap,
       logRequestsPerSecond,
+      rpcTimeoutMs,
     });
     await updateIndexerRunState(channel.slug, {
       observerSuccessAt: new Date(),

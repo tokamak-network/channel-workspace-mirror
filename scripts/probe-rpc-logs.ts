@@ -22,6 +22,7 @@ const { values } = parseArgs({
     "to-block": { type: "string" },
     ranges: { type: "string", default: "3000,1000,500,100,50" },
     mode: { type: "string", default: "both" },
+    "timeout-ms": { type: "string", default: "120000" },
   },
 });
 
@@ -32,6 +33,7 @@ async function main() {
   const fromBlock = BigInt(requiredString(values["from-block"], "from-block"));
   const toBlock = BigInt(requiredString(values["to-block"], "to-block"));
   const mode = probeMode(values.mode);
+  const timeoutMs = positiveInteger(Number(values["timeout-ms"]), "timeout-ms");
   const ranges = String(values.ranges)
     .split(",")
     .map((value) => BigInt(value.trim()))
@@ -48,15 +50,17 @@ async function main() {
 
   for (const probeCase of cases) {
     if (mode === "raw" || mode === "both") {
-      await runRawProbe(rpcUrl, address, topic, probeCase);
+      await runRawProbe(rpcUrl, address, topic, probeCase, timeoutMs);
     }
     if (mode === "viem" || mode === "both") {
-      await runViemProbe(rpcUrl, address, topic, probeCase);
+      await runViemProbe(rpcUrl, address, topic, probeCase, timeoutMs);
     }
   }
 }
 
-async function runRawProbe(rpcUrl: string, address: Address, topic: Hex, probeCase: ProbeCase) {
+async function runRawProbe(rpcUrl: string, address: Address, topic: Hex, probeCase: ProbeCase, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const started = performance.now();
   try {
     const response = await fetch(rpcUrl, {
@@ -64,6 +68,7 @@ async function runRawProbe(rpcUrl: string, address: Address, topic: Hex, probeCa
       headers: {
         "Content-Type": "application/json",
       },
+      signal: controller.signal,
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -83,13 +88,15 @@ async function runRawProbe(rpcUrl: string, address: Address, topic: Hex, probeCa
     printResult("raw", probeCase, performance.now() - started, "ok", body.result?.length ?? 0);
   } catch (error) {
     printResult("raw", probeCase, performance.now() - started, "failed", null, error);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
-async function runViemProbe(rpcUrl: string, address: Address, topic: Hex, probeCase: ProbeCase) {
+async function runViemProbe(rpcUrl: string, address: Address, topic: Hex, probeCase: ProbeCase, timeoutMs: number) {
   const client = createPublicClient({
     chain: mainnet,
-    transport: http(rpcUrl),
+    transport: http(rpcUrl, { timeout: timeoutMs }),
   });
   const started = performance.now();
   try {
@@ -141,6 +148,13 @@ function requiredString(value: unknown, name: string) {
     throw new Error(`${name} is required.`);
   }
   return value.trim();
+}
+
+function positiveInteger(value: number, name: string) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+  return value;
 }
 
 function hexBlock(value: bigint): Hex {

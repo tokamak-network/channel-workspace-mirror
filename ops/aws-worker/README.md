@@ -57,8 +57,9 @@ The bootstrap script installs:
 - `channel-workspace-mirror-indexer.service`
 - `channel-workspace-mirror-indexer.timer`
 
-The timer wakes every five minutes by default. Each wake attempts CLI recovery and observer sync.
-Mirror publishing still checks the DB mirror publish interval before uploading a new mirror archive.
+The repository-managed timer runs the worker on one five minute cadence. It does not use a separate
+boot-only first-run timer. Each wake attempts CLI recovery and observer sync. Mirror publishing still
+checks the DB mirror publish interval before uploading a new mirror archive.
 
 Useful commands:
 
@@ -73,3 +74,33 @@ service runs as the `channelmirror` system user with that home directory.
 
 Each worker run installs `@tokamak-private-dapps/private-state-cli@latest` into the worker user's
 private npm prefix before recovery starts.
+
+## Repository-Managed Updates
+
+`ops/aws-worker/update-worker.sh` is the source of truth for updating the EC2 worker after a remote
+push. GitHub Actions copies this script to the EC2 host, opens SSH only for the current runner IP,
+runs the script with `sudo`, and then removes the temporary SSH rule.
+
+The update script:
+
+- makes `channelmirror` the owner of `/opt/channel-workspace-mirror`
+- fetches and resets the checkout to the configured branch
+- runs `npm ci`
+- installs the repository-managed systemd service and timer units
+- reloads systemd and enables the timer
+
+Secrets remain in `/etc/channel-workspace-mirror.env`; the update script does not print or replace
+that file.
+
+The GitHub Actions workflow expects these repository variables:
+
+- `AWS_REGION`
+- `AWS_ROLE_ARN`
+- `EC2_HOST`
+- `EC2_PORT`
+- `EC2_SECURITY_GROUP_ID`
+- `EC2_USER`
+
+It expects this repository secret:
+
+- `EC2_SSH_PRIVATE_KEY`

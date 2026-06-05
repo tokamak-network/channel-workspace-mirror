@@ -8,7 +8,6 @@ APP_DIR="${APP_DIR:-/opt/${APP_NAME}}"
 ENV_FILE="${ENV_FILE:-/etc/${APP_NAME}.env}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 APP_BRANCH="${APP_BRANCH:-main}"
-TIMER_INTERVAL="${TIMER_INTERVAL:-5min}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root: sudo $0" >&2
@@ -44,72 +43,8 @@ fi
 
 npm install -g "@tokamak-private-dapps/private-state-cli@latest"
 
-if ! id "${APP_USER}" >/dev/null 2>&1; then
-  useradd --system --create-home --home-dir "${APP_HOME}" --shell /usr/sbin/nologin "${APP_USER}"
-fi
-
-mkdir -p "${APP_HOME}" "${APP_DIR}"
-chown -R "${APP_USER}:${APP_USER}" "${APP_HOME}" "${APP_DIR}"
-
-if [[ -d "${APP_DIR}/.git" ]]; then
-  sudo -u "${APP_USER}" git -C "${APP_DIR}" fetch --prune origin
-  sudo -u "${APP_USER}" git -C "${APP_DIR}" checkout "${APP_BRANCH}"
-  sudo -u "${APP_USER}" git -C "${APP_DIR}" pull --ff-only origin "${APP_BRANCH}"
-elif [[ -f "${APP_DIR}/package.json" ]]; then
-  echo "Using existing source tree at ${APP_DIR}."
-else
-  if [[ -z "${APP_REPO_URL:-}" || "${APP_REPO_URL}" == "https://github.com/<owner>/<repo>.git" ]]; then
-    echo "APP_REPO_URL must be set in ${ENV_FILE}, or clone the repo into ${APP_DIR} before running this script." >&2
-    exit 1
-  fi
-  rm -rf "${APP_DIR:?}/"*
-  sudo -u "${APP_USER}" git clone --branch "${APP_BRANCH}" "${APP_REPO_URL}" "${APP_DIR}"
-fi
-
-chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
-sudo -u "${APP_USER}" npm --prefix "${APP_DIR}" install
-
-cat > /etc/systemd/system/${APP_NAME}-indexer.service <<EOF
-[Unit]
-Description=Channel workspace mirror indexer
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=oneshot
-User=${APP_USER}
-Group=${APP_USER}
-WorkingDirectory=${APP_DIR}
-EnvironmentFile=${ENV_FILE}
-Environment=HOME=${APP_HOME}
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/npm run indexer:run
-Nice=5
-IOSchedulingClass=best-effort
-IOSchedulingPriority=6
-TimeoutStartSec=12h
-PrivateTmp=true
-NoNewPrivileges=true
-ProtectSystem=full
-ReadWritePaths=${APP_DIR} ${APP_HOME} /tmp
-EOF
-
-cat > /etc/systemd/system/${APP_NAME}-indexer.timer <<EOF
-[Unit]
-Description=Run channel workspace mirror indexer periodically
-
-[Timer]
-OnBootSec=2min
-OnUnitInactiveSec=${TIMER_INTERVAL}
-Persistent=true
-Unit=${APP_NAME}-indexer.service
-
-[Install]
-WantedBy=timers.target
-EOF
-
-systemctl daemon-reload
-systemctl enable --now ${APP_NAME}-indexer.timer
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "${script_dir}/update-worker.sh"
 
 echo "Installed ${APP_NAME}-indexer.timer."
 echo "Check status with: systemctl status ${APP_NAME}-indexer.timer ${APP_NAME}-indexer.service"
