@@ -50,6 +50,13 @@ npm run migrate
 The migration creates `mirror_publish_history`, which is required for latest-checkpoint enforcement
 and stable route-to-Blob mapping.
 
+For an existing deployment whose schema was applied before `schema_migrations` existed, initialize
+the migration history only after confirming the current repository migrations are already applied:
+
+```bash
+npm run migrate -- --baseline-existing
+```
+
 ## Publishing
 
 Generate mirror files with the private-state CLI:

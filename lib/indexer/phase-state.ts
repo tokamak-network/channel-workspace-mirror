@@ -66,10 +66,12 @@ export async function updateIndexerPhaseState(
         else indexer_phase_state.started_at
       end,
       succeeded_at = case
+        when excluded.status in ('running', 'failed') then null
         when ${hasSucceededAt}::boolean then excluded.succeeded_at
         else indexer_phase_state.succeeded_at
       end,
       failed_at = case
+        when excluded.status in ('running', 'succeeded', 'skipped') then null
         when ${hasFailedAt}::boolean then excluded.failed_at
         else indexer_phase_state.failed_at
       end,
@@ -86,6 +88,7 @@ export async function updateIndexerPhaseState(
         else indexer_phase_state.checkpoint_block
       end,
       last_error = case
+        when excluded.status in ('running', 'succeeded', 'skipped') then null
         when ${hasLastError}::boolean then excluded.last_error
         else indexer_phase_state.last_error
       end,

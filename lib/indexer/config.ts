@@ -80,6 +80,21 @@ export async function requireIndexerRuntimeConfig(channelSlug: string) {
 export async function updateIndexerRuntimeConfig(channelSlug: string, input: IndexerRuntimeConfigInput) {
   validateConfigInput(input);
   const sql = getSql();
+  const hasRpcUrl = Object.hasOwn(input, "rpcUrl");
+  const hasLogRequestsPerSecond = Object.hasOwn(input, "logRequestsPerSecond");
+  const hasBlockRangeCap = Object.hasOwn(input, "blockRangeCap");
+  const hasObserverRpcTimeoutMs = Object.hasOwn(input, "observerRpcTimeoutMs");
+  const hasObserverCostProfile = Object.hasOwn(input, "observerCostProfile");
+  const hasObserverPageCacheTtlSeconds = Object.hasOwn(input, "observerPageCacheTtlSeconds");
+  const hasObserverApiCacheTtlSeconds = Object.hasOwn(input, "observerApiCacheTtlSeconds");
+  const hasObserverSyncMinIntervalSeconds = Object.hasOwn(input, "observerSyncMinIntervalSeconds");
+  const hasObserverDefaultListMode = Object.hasOwn(input, "observerDefaultListMode");
+  const hasObserverEventListLimit = Object.hasOwn(input, "observerEventListLimit");
+  const hasObserverIncludeParticipantAccounting = Object.hasOwn(input, "observerIncludeParticipantAccounting");
+  const hasObserverIncludeIncidentHistory = Object.hasOwn(input, "observerIncludeIncidentHistory");
+  const hasObserverNpmVersionCacheTtlSeconds = Object.hasOwn(input, "observerNpmVersionCacheTtlSeconds");
+  const hasMirrorPublishIntervalSeconds = Object.hasOwn(input, "mirrorPublishIntervalSeconds");
+  const hasMirrorPublishAccount = Object.hasOwn(input, "mirrorPublishAccount");
   const rows = await sql`
     insert into indexer_runtime_config (
       channel_slug,
@@ -120,21 +135,21 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       now()
     )
     on conflict (channel_slug) do update set
-      rpc_url = excluded.rpc_url,
-      log_requests_per_second = excluded.log_requests_per_second,
-      block_range_cap = excluded.block_range_cap,
-      observer_rpc_timeout_ms = excluded.observer_rpc_timeout_ms,
-      observer_cost_profile = excluded.observer_cost_profile,
-      observer_page_cache_ttl_seconds = excluded.observer_page_cache_ttl_seconds,
-      observer_api_cache_ttl_seconds = excluded.observer_api_cache_ttl_seconds,
-      observer_sync_min_interval_seconds = excluded.observer_sync_min_interval_seconds,
-      observer_default_list_mode = excluded.observer_default_list_mode,
-      observer_event_list_limit = excluded.observer_event_list_limit,
-      observer_include_participant_accounting = excluded.observer_include_participant_accounting,
-      observer_include_incident_history = excluded.observer_include_incident_history,
-      observer_npm_version_cache_ttl_seconds = excluded.observer_npm_version_cache_ttl_seconds,
-      mirror_publish_interval_seconds = excluded.mirror_publish_interval_seconds,
-      mirror_publish_account = excluded.mirror_publish_account,
+      rpc_url = case when ${hasRpcUrl}::boolean then excluded.rpc_url else indexer_runtime_config.rpc_url end,
+      log_requests_per_second = case when ${hasLogRequestsPerSecond}::boolean then excluded.log_requests_per_second else indexer_runtime_config.log_requests_per_second end,
+      block_range_cap = case when ${hasBlockRangeCap}::boolean then excluded.block_range_cap else indexer_runtime_config.block_range_cap end,
+      observer_rpc_timeout_ms = case when ${hasObserverRpcTimeoutMs}::boolean then excluded.observer_rpc_timeout_ms else indexer_runtime_config.observer_rpc_timeout_ms end,
+      observer_cost_profile = case when ${hasObserverCostProfile}::boolean then excluded.observer_cost_profile else indexer_runtime_config.observer_cost_profile end,
+      observer_page_cache_ttl_seconds = case when ${hasObserverPageCacheTtlSeconds}::boolean then excluded.observer_page_cache_ttl_seconds else indexer_runtime_config.observer_page_cache_ttl_seconds end,
+      observer_api_cache_ttl_seconds = case when ${hasObserverApiCacheTtlSeconds}::boolean then excluded.observer_api_cache_ttl_seconds else indexer_runtime_config.observer_api_cache_ttl_seconds end,
+      observer_sync_min_interval_seconds = case when ${hasObserverSyncMinIntervalSeconds}::boolean then excluded.observer_sync_min_interval_seconds else indexer_runtime_config.observer_sync_min_interval_seconds end,
+      observer_default_list_mode = case when ${hasObserverDefaultListMode}::boolean then excluded.observer_default_list_mode else indexer_runtime_config.observer_default_list_mode end,
+      observer_event_list_limit = case when ${hasObserverEventListLimit}::boolean then excluded.observer_event_list_limit else indexer_runtime_config.observer_event_list_limit end,
+      observer_include_participant_accounting = case when ${hasObserverIncludeParticipantAccounting}::boolean then excluded.observer_include_participant_accounting else indexer_runtime_config.observer_include_participant_accounting end,
+      observer_include_incident_history = case when ${hasObserverIncludeIncidentHistory}::boolean then excluded.observer_include_incident_history else indexer_runtime_config.observer_include_incident_history end,
+      observer_npm_version_cache_ttl_seconds = case when ${hasObserverNpmVersionCacheTtlSeconds}::boolean then excluded.observer_npm_version_cache_ttl_seconds else indexer_runtime_config.observer_npm_version_cache_ttl_seconds end,
+      mirror_publish_interval_seconds = case when ${hasMirrorPublishIntervalSeconds}::boolean then excluded.mirror_publish_interval_seconds else indexer_runtime_config.mirror_publish_interval_seconds end,
+      mirror_publish_account = case when ${hasMirrorPublishAccount}::boolean then excluded.mirror_publish_account else indexer_runtime_config.mirror_publish_account end,
       updated_at = now()
     returning *
   ` as IndexerRuntimeConfig[];
