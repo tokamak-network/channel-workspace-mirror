@@ -83,6 +83,8 @@ const TARGETED_EVENTS = [
   { addressKey: "bridgeTokenVault", eventName: "OwnershipTransferred" },
 ] as const;
 
+export const TARGETED_EVENT_SYNC_KEY = "targeted-observer-events-v1";
+
 const currentStateAbi = parseAbi([
   "function bridgeTokenVault() view returns (address)",
   "function channelDeployer() view returns (address)",
@@ -683,37 +685,62 @@ async function syncTargetedEvents({
   blockRangeCap: bigint;
 }) {
   let insertedOrUpdated = 0;
-  for (const target of TARGETED_EVENTS) {
-    const syncKey = `targeted:${target.addressKey}:${target.eventName}`;
-    const state = await getEventSyncState(channel, syncKey);
-    const fromBlock = state?.last_scanned_block ? BigInt(state.last_scanned_block) + 1n : channel.genesisBlock;
-    if (fromBlock > latestBlock) {
-      await updateEventSyncState(channel, syncKey, state?.last_scanned_block ? BigInt(state.last_scanned_block) : channel.genesisBlock - 1n, latestBlock);
-      continue;
+  const state = await getEventSyncState(channel, TARGETED_EVENT_SYNC_KEY);
+  const fromBlock = state?.last_scanned_block ? BigInt(state.last_scanned_block) + 1n : channel.genesisBlock;
+  if (fromBlock > latestBlock) {
+    await updateEventSyncState(channel, TARGETED_EVENT_SYNC_KEY, state?.last_scanned_block ? BigInt(state.last_scanned_block) : channel.genesisBlock - 1n, latestBlock);
+    return insertedOrUpdated;
+  }
+
+  const filter = targetedLogFilter(channel);
+  for (const { fromBlock: chunkFromBlock, toBlock } of targetedScanRanges(fromBlock, latestBlock, blockRangeCap)) {
+    const logs = await limitedRpc(limiter, () => client.getLogs({
+      address: filter.addresses,
+      events: filter.events,
+      fromBlock: chunkFromBlock,
+      toBlock,
+    }));
+    const relevantLogs = decodeRelevantLogs(channel, logs);
+    const timestamps = await blockTimestamps(client, limiter, relevantLogs);
+
+    for (const decoded of relevantLogs) {
+      await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null);
+      insertedOrUpdated += 1;
     }
 
-    let cursor = fromBlock;
-    while (cursor <= latestBlock) {
-      const toBlock = minBigInt(cursor + blockRangeCap - 1n, latestBlock);
-      const logs = await limitedRpc(limiter, () => client.getLogs({
-        address: addressForTarget(channel, target.addressKey),
-        event: abiEvent(target.eventName),
-        fromBlock: cursor,
-        toBlock,
-      }));
-      const relevantLogs = decodeRelevantLogs(channel, logs);
-      const timestamps = await blockTimestamps(client, limiter, relevantLogs);
-
-      for (const decoded of relevantLogs) {
-        await insertObserverEvent(channel, decoded, timestamps.get(decoded.blockNumber.toString()) ?? null);
-        insertedOrUpdated += 1;
-      }
-
-      await updateEventSyncState(channel, syncKey, toBlock, latestBlock);
-      cursor = toBlock + 1n;
-    }
+    await updateEventSyncState(channel, TARGETED_EVENT_SYNC_KEY, toBlock, latestBlock);
   }
   return insertedOrUpdated;
+}
+
+export function targetedLogFilter(channel: ObserverChannelConfig) {
+  return {
+    addresses: targetedAddresses(channel),
+    events: targetedAbiEvents(),
+  };
+}
+
+export function targetedScanRanges(fromBlock: bigint, latestBlock: bigint, blockRangeCap: bigint) {
+  const ranges: { fromBlock: bigint; toBlock: bigint }[] = [];
+  let cursor = fromBlock;
+  while (cursor <= latestBlock) {
+    const toBlock = minBigInt(cursor + blockRangeCap - 1n, latestBlock);
+    ranges.push({ fromBlock: cursor, toBlock });
+    cursor = toBlock + 1n;
+  }
+  return ranges;
+}
+
+export function targetedEventNames() {
+  return [...new Set(TARGETED_EVENTS.map((target) => target.eventName))];
+}
+
+function targetedAddresses(channel: ObserverChannelConfig) {
+  return [...new Set(TARGETED_EVENTS.map((target) => channel[target.addressKey] as Address))];
+}
+
+function targetedAbiEvents() {
+  return targetedEventNames().map((eventName) => requiredAbiEvent(eventName));
 }
 
 function rawHistoryFiles(historyDir: string) {
@@ -1058,16 +1085,12 @@ async function insertObserverEvent(
   `;
 }
 
-function abiEvent(eventName: string) {
+function requiredAbiEvent(eventName: string) {
   const event = observerAbi.find((item) => item.type === "event" && item.name === eventName) as AbiEvent | undefined;
   if (!event) {
     throw new Error(`Observer ABI does not contain event ${eventName}.`);
   }
   return event;
-}
-
-function addressForTarget(channel: ObserverChannelConfig, addressKey: (typeof TARGETED_EVENTS)[number]["addressKey"]) {
-  return channel[addressKey] as Address;
 }
 
 function toBigIntOrNull(value: unknown) {
