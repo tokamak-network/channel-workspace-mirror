@@ -61,6 +61,7 @@ jobs:
           set -euo pipefail
           ssh -p "${{ vars.EC2_PORT }}" -i ~/.ssh/ec2_worker_key "${{ vars.EC2_USER }}@${{ vars.EC2_HOST }}" '
             set -euo pipefail
+            systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnCalendar=\\*-\\*-\\* 07:00:00 UTC"
             systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnUnitInactiveSec=5min"
             ! systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnBootSec"
             test "$(stat -c "%U:%G" /opt/channel-workspace-mirror)" = "channelmirror:channelmirror"

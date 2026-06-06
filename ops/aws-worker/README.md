@@ -35,9 +35,10 @@ NODE_MAJOR=22
 The runtime RPC URL and RPC limits are not stored in this file. They are read from Neon through the
 admin-config API and used by `npm run indexer:run`.
 
-`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required for mirror upload failure alerts. The
-worker sends an alert when a mirror publish run is due but fails before a mirror upload is recorded.
-Telegram delivery failures are logged, but they do not replace the original worker failure.
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are required for mirror upload completion alerts. The
+worker sends a Telegram message after every due mirror publish attempt with either the success or
+failure result. Telegram delivery failures are logged, but they do not replace the original worker
+result.
 
 ## Install
 
@@ -57,9 +58,10 @@ The bootstrap script installs:
 - `channel-workspace-mirror-indexer.service`
 - `channel-workspace-mirror-indexer.timer`
 
-The repository-managed timer runs the worker on one five minute cadence. It does not use a separate
-boot-only first-run timer. Each wake attempts CLI recovery and observer sync. Mirror publishing still
-checks the DB mirror publish interval before uploading a new mirror archive.
+The repository-managed timer keeps the five minute observer cadence and also wakes the worker at
+`07:00 UTC`, which is 15:00 in Asia/Singapore. It does not use a separate boot-only first-run timer.
+Each wake attempts CLI recovery and observer sync. Mirror publishing runs once per Singapore
+calendar day at the first worker execution at or after 15:00 Asia/Singapore.
 
 Useful commands:
 

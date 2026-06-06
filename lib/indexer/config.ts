@@ -182,17 +182,6 @@ export async function updateIndexerRunState(
   return rows[0];
 }
 
-export function isDue(lastRunAt: string | null, intervalSeconds: number, now = new Date()) {
-  if (!lastRunAt) {
-    return true;
-  }
-  const lastRunMs = Date.parse(lastRunAt);
-  if (!Number.isFinite(lastRunMs)) {
-    return true;
-  }
-  return now.getTime() - lastRunMs >= intervalSeconds * 1000;
-}
-
 export function effectiveObserverRpcTimeoutMs(config: Pick<IndexerRuntimeConfig, "observer_rpc_timeout_ms">) {
   return assertPositiveInteger(
     config.observer_rpc_timeout_ms ?? defaultObserverRpcTimeoutMs(),

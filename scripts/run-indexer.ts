@@ -6,16 +6,16 @@ import { loadLocalEnv } from "../lib/env";
 import {
   effectiveObserverRpcTimeoutMs,
   getIndexerRunState,
-  isDue,
   requireIndexerRuntimeConfig,
   updateIndexerRunState,
 } from "../lib/indexer/config";
+import { isDailyMirrorPublishDue } from "../lib/indexer/mirror-schedule";
 import { updateIndexerPhaseState } from "../lib/indexer/phase-state";
 import { validateMirrorUploadDirectory } from "../lib/manifest";
 import { publishMirrorUpload } from "../lib/publish";
 import { DEFAULT_OBSERVER_CHANNEL } from "../lib/observer/config";
 import { resetObserverAccumulatedScan, syncObserverChannel } from "../lib/observer/sync";
-import { notifyMirrorUploadFailure, type MirrorFailureStage } from "../lib/telegram";
+import { notifyMirrorUploadCompletion, notifyMirrorUploadFailure, type MirrorFailureStage } from "../lib/telegram";
 
 loadLocalEnv();
 
@@ -44,7 +44,7 @@ async function main() {
   const config = await requireIndexerRuntimeConfig(channel.slug);
   const state = await getIndexerRunState(channel.slug);
   const now = new Date();
-  const mirrorDue = isDue(state?.last_mirror_run_at ?? null, config.mirror_publish_interval_seconds, now);
+  const mirrorDue = isDailyMirrorPublishDue(state?.last_mirror_run_at ?? null, now);
   let phase: IndexerPhase = mirrorDue ? "mirror" : "observer";
   let mirrorFailureStage: MirrorFailureStage = "configure_cli";
   let checkpointBlock: string | number | null = null;
@@ -107,6 +107,16 @@ async function main() {
         succeededAt: new Date(),
         checkpointBlock: mirror.checkpointBlock,
         lastError: null,
+      });
+      await notifyMirrorUploadCompletion({
+        channelName: channel.name,
+        channelSlug: channel.slug,
+        occurredAt: new Date(),
+        status: "succeeded",
+        stage: mirrorFailureStage,
+        lastMirrorSuccessAt: state?.last_mirror_success_at ?? null,
+        checkpointBlock,
+        workerHost: os.hostname(),
       });
     }
 

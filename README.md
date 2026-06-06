@@ -140,11 +140,12 @@ It performs the operator flow in this order:
 - `private-state-cli install --read-only`
 - `private-state-cli set rpc` from the DB runtime config
 - `private-state-cli channel recover-workspace --source rpc --output-raw`, with
-  `--publish-workspace-mirror --leader-account ... --output ...` added when mirror publishing is due
+  `--publish-workspace-mirror --leader-account ... --output ...` added when the daily mirror
+  publish schedule is due
 - observer raw-history import for state-recovery events
 - targeted observer RPC scans for bridge, participant, note-delivery, verifier, admin, and upgrade
   events
-- mirror output validation and upload when mirror publishing is due
+- mirror output validation and upload when the daily mirror publish schedule is due
 
 The first worker run on a persistent host performs `recover-workspace --from-genesis --output-raw`
 when the local CLI workspace has no recovered channel snapshot yet. Later runs use that host's CLI
@@ -170,9 +171,11 @@ The worker uses the same Neon database and Vercel Blob token as the Vercel deplo
 configuration is still managed through `/api/admin/indexer-config`; the EC2 host only needs
 `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, and `ADMIN_TOKEN` in `/etc/channel-workspace-mirror.env`.
 
-The systemd timer controls observer sync frequency. Each worker wake attempts CLI recovery and
-observer sync. Mirror publishing still checks the DB mirror publish interval before uploading a new
-mirror archive.
+The systemd timer controls observer sync frequency and also wakes the worker at the daily mirror
+publish time. Each worker wake attempts CLI recovery and observer sync. Mirror publishing runs once
+per Singapore calendar day at the first worker execution at or after 15:00 Asia/Singapore
+(`07:00 UTC`). The timer includes an explicit `07:00 UTC` calendar trigger and keeps the five minute
+observer cadence.
 
 ## Health
 

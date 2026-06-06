@@ -7,15 +7,20 @@ type TelegramEnv = {
 
 export type MirrorFailureStage = "configure_cli" | "recover_workspace" | "observer_sync" | "upload";
 
-export type MirrorFailureNotificationInput = {
+export type MirrorUploadNotificationInput = {
   channelName: string;
   channelSlug: string;
-  errorMessage: string;
   occurredAt: Date;
   stage: MirrorFailureStage;
+  status: "succeeded" | "failed";
   lastMirrorSuccessAt?: string | null;
   checkpointBlock?: string | number | null;
   workerHost?: string | null;
+  errorMessage?: string | null;
+};
+
+export type MirrorFailureNotificationInput = Omit<MirrorUploadNotificationInput, "status"> & {
+  errorMessage: string;
 };
 
 export type TelegramNotificationResult =
@@ -30,10 +35,18 @@ export async function notifyMirrorUploadFailure(
   env: TelegramEnv = process.env,
   fetchImpl: TelegramFetch = fetch,
 ): Promise<TelegramNotificationResult> {
+  return notifyMirrorUploadCompletion({ ...input, status: "failed" }, env, fetchImpl);
+}
+
+export async function notifyMirrorUploadCompletion(
+  input: MirrorUploadNotificationInput,
+  env: TelegramEnv = process.env,
+  fetchImpl: TelegramFetch = fetch,
+): Promise<TelegramNotificationResult> {
   const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = env.TELEGRAM_CHAT_ID?.trim();
   if (!botToken || !chatId) {
-    console.error("Telegram mirror failure notification was not sent: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required.");
+    console.error("Telegram mirror upload notification was not sent: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required.");
     return { sent: false, reason: "missing_config" };
   }
 
@@ -41,31 +54,39 @@ export async function notifyMirrorUploadFailure(
     await sendTelegramMessage({
       botToken,
       chatId,
-      text: formatMirrorFailureMessage(input),
+      text: formatMirrorUploadCompletionMessage(input),
       fetchImpl,
     });
     return { sent: true };
   } catch (error) {
-    console.error(`Telegram mirror failure notification failed: ${formatTelegramError(error, botToken)}`);
+    console.error(`Telegram mirror upload notification failed: ${formatTelegramError(error, botToken)}`);
     return { sent: false, reason: "send_failed" };
   }
 }
 
 export function formatMirrorFailureMessage(input: MirrorFailureNotificationInput) {
+  return formatMirrorUploadCompletionMessage({ ...input, status: "failed" });
+}
+
+export function formatMirrorUploadCompletionMessage(input: MirrorUploadNotificationInput) {
   const checkpointBlock = input.checkpointBlock === undefined || input.checkpointBlock === null
     ? "unknown"
     : String(input.checkpointBlock);
   const workerHost = input.workerHost?.trim() || "unknown";
-  return truncateTelegramMessage([
-    "Mirror upload failed",
+  const lines = [
+    input.status === "succeeded" ? "Mirror upload succeeded" : "Mirror upload failed",
     `Channel: ${input.channelName} (${input.channelSlug})`,
+    `Status: ${input.status}`,
     `Stage: ${input.stage}`,
     `Time: ${input.occurredAt.toISOString()}`,
     `Last mirror success: ${input.lastMirrorSuccessAt ?? "never"}`,
     `Checkpoint block: ${checkpointBlock}`,
     `Worker: ${workerHost}`,
-    `Error: ${input.errorMessage}`,
-  ].join("\n"));
+  ];
+  if (input.status === "failed") {
+    lines.push(`Error: ${input.errorMessage ?? "unknown"}`);
+  }
+  return truncateTelegramMessage(lines.join("\n"));
 }
 
 async function sendTelegramMessage({
