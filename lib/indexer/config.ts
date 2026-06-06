@@ -6,6 +6,15 @@ export type IndexerRuntimeConfig = {
   log_requests_per_second: string | null;
   block_range_cap: number | null;
   observer_rpc_timeout_ms: number | null;
+  observer_cost_profile: string | null;
+  observer_page_cache_ttl_seconds: number | null;
+  observer_api_cache_ttl_seconds: number | null;
+  observer_sync_min_interval_seconds: number | null;
+  observer_default_list_mode: string | null;
+  observer_event_list_limit: number | null;
+  observer_include_participant_accounting: string | null;
+  observer_include_incident_history: string | null;
+  observer_npm_version_cache_ttl_seconds: number | null;
   mirror_publish_interval_seconds: number;
   mirror_publish_account: string | null;
   updated_at: string;
@@ -31,6 +40,15 @@ export type IndexerRuntimeConfigInput = {
   logRequestsPerSecond?: number | null;
   blockRangeCap?: number | null;
   observerRpcTimeoutMs?: number | null;
+  observerCostProfile?: string | null;
+  observerPageCacheTtlSeconds?: number | null;
+  observerApiCacheTtlSeconds?: number | null;
+  observerSyncMinIntervalSeconds?: number | null;
+  observerDefaultListMode?: string | null;
+  observerEventListLimit?: number | null;
+  observerIncludeParticipantAccounting?: string | null;
+  observerIncludeIncidentHistory?: string | null;
+  observerNpmVersionCacheTtlSeconds?: number | null;
   mirrorPublishIntervalSeconds?: number;
   mirrorPublishAccount?: string | null;
 };
@@ -69,6 +87,15 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       log_requests_per_second,
       block_range_cap,
       observer_rpc_timeout_ms,
+      observer_cost_profile,
+      observer_page_cache_ttl_seconds,
+      observer_api_cache_ttl_seconds,
+      observer_sync_min_interval_seconds,
+      observer_default_list_mode,
+      observer_event_list_limit,
+      observer_include_participant_accounting,
+      observer_include_incident_history,
+      observer_npm_version_cache_ttl_seconds,
       mirror_publish_interval_seconds,
       mirror_publish_account,
       updated_at
@@ -79,6 +106,15 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       ${input.logRequestsPerSecond == null ? null : String(input.logRequestsPerSecond)}::numeric,
       ${input.blockRangeCap == null ? null : String(input.blockRangeCap)}::integer,
       ${String(input.observerRpcTimeoutMs ?? defaultObserverRpcTimeoutMs())}::integer,
+      ${input.observerCostProfile ?? "performance"},
+      ${input.observerPageCacheTtlSeconds == null ? null : String(input.observerPageCacheTtlSeconds)}::integer,
+      ${input.observerApiCacheTtlSeconds == null ? null : String(input.observerApiCacheTtlSeconds)}::integer,
+      ${input.observerSyncMinIntervalSeconds == null ? null : String(input.observerSyncMinIntervalSeconds)}::integer,
+      ${input.observerDefaultListMode ?? null},
+      ${input.observerEventListLimit == null ? null : String(input.observerEventListLimit)}::integer,
+      ${input.observerIncludeParticipantAccounting ?? null},
+      ${input.observerIncludeIncidentHistory ?? null},
+      ${input.observerNpmVersionCacheTtlSeconds == null ? null : String(input.observerNpmVersionCacheTtlSeconds)}::integer,
       ${String(input.mirrorPublishIntervalSeconds ?? 86400)}::integer,
       ${input.mirrorPublishAccount ?? null},
       now()
@@ -88,6 +124,15 @@ export async function updateIndexerRuntimeConfig(channelSlug: string, input: Ind
       log_requests_per_second = excluded.log_requests_per_second,
       block_range_cap = excluded.block_range_cap,
       observer_rpc_timeout_ms = excluded.observer_rpc_timeout_ms,
+      observer_cost_profile = excluded.observer_cost_profile,
+      observer_page_cache_ttl_seconds = excluded.observer_page_cache_ttl_seconds,
+      observer_api_cache_ttl_seconds = excluded.observer_api_cache_ttl_seconds,
+      observer_sync_min_interval_seconds = excluded.observer_sync_min_interval_seconds,
+      observer_default_list_mode = excluded.observer_default_list_mode,
+      observer_event_list_limit = excluded.observer_event_list_limit,
+      observer_include_participant_accounting = excluded.observer_include_participant_accounting,
+      observer_include_incident_history = excluded.observer_include_incident_history,
+      observer_npm_version_cache_ttl_seconds = excluded.observer_npm_version_cache_ttl_seconds,
       mirror_publish_interval_seconds = excluded.mirror_publish_interval_seconds,
       mirror_publish_account = excluded.mirror_publish_account,
       updated_at = now()
@@ -201,6 +246,15 @@ function validateConfigInput(input: IndexerRuntimeConfigInput) {
   assertOptionalPositiveInteger(input.mirrorPublishIntervalSeconds, "mirrorPublishIntervalSeconds");
   assertOptionalPositiveInteger(input.blockRangeCap, "blockRangeCap");
   assertOptionalPositiveInteger(input.observerRpcTimeoutMs, "observerRpcTimeoutMs");
+  assertOptionalPositiveInteger(input.observerPageCacheTtlSeconds, "observerPageCacheTtlSeconds");
+  assertOptionalPositiveInteger(input.observerApiCacheTtlSeconds, "observerApiCacheTtlSeconds");
+  assertOptionalPositiveInteger(input.observerSyncMinIntervalSeconds, "observerSyncMinIntervalSeconds");
+  assertOptionalPositiveInteger(input.observerEventListLimit, "observerEventListLimit");
+  assertOptionalPositiveInteger(input.observerNpmVersionCacheTtlSeconds, "observerNpmVersionCacheTtlSeconds");
+  assertOptionalOneOf(input.observerCostProfile, "observerCostProfile", ["cost", "balanced", "performance"]);
+  assertOptionalOneOf(input.observerDefaultListMode, "observerDefaultListMode", ["none", "section_only", "all"]);
+  assertOptionalOneOf(input.observerIncludeParticipantAccounting, "observerIncludeParticipantAccounting", ["false", "section_only", "always"]);
+  assertOptionalOneOf(input.observerIncludeIncidentHistory, "observerIncludeIncidentHistory", ["none", "active_only", "full"]);
   if (input.logRequestsPerSecond != null && (!Number.isFinite(input.logRequestsPerSecond) || input.logRequestsPerSecond <= 0)) {
     throw new Error("logRequestsPerSecond must be a positive number.");
   }
@@ -220,4 +274,13 @@ function assertPositiveInteger(value: number, name: string) {
     throw new Error(`${name} must be a positive integer.`);
   }
   return value;
+}
+
+function assertOptionalOneOf(value: string | undefined | null, name: string, allowed: readonly string[]) {
+  if (value == null) {
+    return;
+  }
+  if (!allowed.includes(value)) {
+    throw new Error(`${name} must be one of ${allowed.join(", ")}.`);
+  }
 }

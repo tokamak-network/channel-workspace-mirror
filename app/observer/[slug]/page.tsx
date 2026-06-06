@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
-import { getObserverDashboard } from "@/lib/observer/queries";
+import { getCachedObserverCostConfig, getCachedObserverDashboard } from "@/lib/observer/cached-queries";
+import { overviewDashboardOptions } from "@/lib/observer/request-options";
 import { ObserverOverview } from "./observer-view";
 
 export default async function ObserverChannelPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const dashboard = await getObserverDashboard(slug, {
-    includeIncidents: "active",
-    listMode: "none",
-  });
+  const costConfig = await getCachedObserverCostConfig(slug);
+  const dashboard = await getCachedObserverDashboard(slug, overviewDashboardOptions(costConfig), costConfig, "page");
   if (!dashboard) {
     notFound();
   }

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getPrivateStateCliLatestVersion } from "@/lib/observer/npm-package";
-import { getObserverDashboard, type ObserverEventListName, type ObserverEventListPage } from "@/lib/observer/queries";
+import { getCachedObserverCostConfig, getCachedObserverDashboard } from "@/lib/observer/cached-queries";
+import { type ObserverEventListName, type ObserverEventListPage } from "@/lib/observer/queries";
+import { sectionDashboardOptions } from "@/lib/observer/request-options";
 import { isObserverSection, ObserverSectionPage } from "../observer-view";
 
 const EVENT_PAGE_PARAMS: Record<ObserverEventListName, string> = {
@@ -38,14 +40,15 @@ export default async function ObserverChannelSectionPage({
     notFound();
   }
 
+  const costConfig = await getCachedObserverCostConfig(slug);
+  const dashboardOptions = sectionDashboardOptions(
+    costConfig,
+    observerSectionForOptions(section),
+    section === "events" ? eventListPages(resolvedSearchParams, costConfig.eventListLimit) : undefined,
+  );
   const [dashboard, npmPackageVersion] = await Promise.all([
-    getObserverDashboard(slug, {
-      includeIncidents: section === "notices",
-      includeParticipantAccounting: section === "participants",
-      listMode: section === "events" ? "events" : section === "upgrades" ? "upgrades" : "none",
-      eventListPages: section === "events" ? eventListPages(resolvedSearchParams) : undefined,
-    }),
-    usesNpmPackageVersion(section) ? getPrivateStateCliLatestVersion() : Promise.resolve(null),
+    getCachedObserverDashboard(slug, dashboardOptions, costConfig, "page"),
+    usesNpmPackageVersion(section) ? getPrivateStateCliLatestVersion(costConfig.npmVersionCacheTtlSeconds) : Promise.resolve(null),
   ]);
   if (!dashboard) {
     notFound();
@@ -65,15 +68,26 @@ function usesNpmPackageVersion(section: string) {
   return section === "channel" || section === "upgrades";
 }
 
-function eventListPages(searchParams: Record<string, string | string[] | undefined>): Partial<Record<ObserverEventListName, ObserverEventListPage>> {
+function observerSectionForOptions(section: string) {
+  if (section === "events" || section === "upgrades" || section === "participants" || section === "notices") {
+    return section;
+  }
+  return "other";
+}
+
+function eventListPages(
+  searchParams: Record<string, string | string[] | undefined>,
+  eventListLimit: number,
+): Partial<Record<ObserverEventListName, ObserverEventListPage>> {
   return Object.fromEntries(
     Object.entries(EVENT_PAGE_PARAMS).map(([listName, pageParam]) => {
       const page = parsePageNumber(searchParams[pageParam]);
+      const pageSize = Math.min(EVENT_PAGE_SIZES[listName as ObserverEventListName], eventListLimit);
       return [
         listName,
         {
-          limit: EVENT_PAGE_SIZES[listName as ObserverEventListName],
-          offset: (page - 1) * EVENT_PAGE_SIZES[listName as ObserverEventListName],
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
         },
       ];
     }),

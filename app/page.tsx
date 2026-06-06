@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { getObserverDashboard } from "@/lib/observer/queries";
+import { getCachedObserverCostConfig, getCachedObserverDashboard } from "@/lib/observer/cached-queries";
+import { overviewDashboardOptions } from "@/lib/observer/request-options";
 import { ObserverOverview } from "./observer/[slug]/observer-view";
 
 const OBSERVER_HOST = "observer.tonnel.io";
@@ -11,10 +12,13 @@ export default async function Home() {
   const host = requestHeaders.get("host")?.split(":")[0];
 
   if (host === OBSERVER_HOST) {
-    const dashboard = await getObserverDashboard(OBSERVER_CHANNEL_SLUG, {
-      includeIncidents: "active",
-      listMode: "none",
-    });
+    const costConfig = await getCachedObserverCostConfig(OBSERVER_CHANNEL_SLUG);
+    const dashboard = await getCachedObserverDashboard(
+      OBSERVER_CHANNEL_SLUG,
+      overviewDashboardOptions(costConfig),
+      costConfig,
+      "page",
+    );
     if (!dashboard) {
       notFound();
     }

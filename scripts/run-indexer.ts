@@ -14,6 +14,7 @@ import { updateIndexerPhaseState } from "../lib/indexer/phase-state";
 import { validateMirrorUploadDirectory } from "../lib/manifest";
 import { publishMirrorUpload } from "../lib/publish";
 import { DEFAULT_OBSERVER_CHANNEL } from "../lib/observer/config";
+import { isObserverSyncDue, resolveObserverCostConfig } from "../lib/observer/cost-config";
 import { resetObserverAccumulatedScan, syncObserverChannel } from "../lib/observer/sync";
 import { notifyMirrorUploadCompletion, notifyMirrorUploadFailure, type MirrorFailureStage } from "../lib/telegram";
 
@@ -45,12 +46,24 @@ async function main() {
   const state = await getIndexerRunState(channel.slug);
   const now = new Date();
   const mirrorDue = isDailyMirrorPublishDue(state?.last_mirror_run_at ?? null, now);
+  const observerCostConfig = resolveObserverCostConfig(config);
+  const observerDue = isObserverSyncDue(state?.last_observer_success_at, now, observerCostConfig.syncMinIntervalSeconds);
   let phase: IndexerPhase = mirrorDue ? "mirror" : "observer";
   let mirrorFailureStage: MirrorFailureStage = "configure_cli";
   let checkpointBlock: string | number | null = null;
 
   try {
     const mirrorPublish = mirrorDue ? mirrorPublishOptions(channel.name, config.mirror_publish_account) : null;
+    if (!mirrorPublish && !observerDue) {
+      console.log(JSON.stringify({
+        ok: true,
+        skipped: "observer_sync_not_due",
+        observerCostProfile: observerCostConfig.profile,
+        observerSyncMinIntervalSeconds: observerCostConfig.syncMinIntervalSeconds,
+        lastObserverSuccessAt: state?.last_observer_success_at ?? null,
+      }, null, 2));
+      return;
+    }
     await configurePrivateStateCli(config);
     mirrorFailureStage = "recover_workspace";
     const localWorkspaceRecovered = hasLocalRecoveredWorkspace(channel.name);

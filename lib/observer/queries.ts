@@ -89,6 +89,7 @@ export type ObserverDashboardOptions = {
   listMode?: "all" | "events" | "upgrades" | "none";
   includeIncidents?: boolean | "active";
   includeParticipantAccounting?: boolean;
+  eventListLimit?: number;
   eventListPages?: Partial<Record<ObserverEventListName, ObserverEventListPage>>;
 };
 
@@ -109,7 +110,7 @@ export type ObserverDashboard = {
     channelParticipantsCount: string;
     joinedParticipantsCount: string;
     exitedParticipantsCount: string;
-    realizedBurntToll: string;
+    realizedBurntToll: string | null;
     eventCounts: Record<string, string>;
   };
   lists: {
@@ -232,7 +233,7 @@ export async function getObserverDashboard(
     ` as unknown as Promise<{ active_count: string; joined_count: string; exited_count: string }[]>,
     options.includeParticipantAccounting
       ? realizedBurntTollRows(channel)
-      : Promise.resolve([{ realized_burnt_toll: "0" }]),
+      : Promise.resolve([{ realized_burnt_toll: null }]),
     sql`
       select event_group, count(*)::text as count
       from observer_events
@@ -290,11 +291,11 @@ export async function getObserverDashboard(
 
   if (listMode === "all" || listMode === "upgrades") {
     const [policyEvents, transitionEvents, verifierEvents, adminEvents, upgradeEvents] = await Promise.all([
-      eventRows(channel, { eventGroup: "policy", decodedFields: DECODED_FIELDS.policy, limit: 100 }),
-      eventRows(channel, { eventGroup: "transition", decodedFields: DECODED_FIELDS.transition, limit: 100 }),
-      eventRows(channel, { eventGroup: "verifier", decodedFields: DECODED_FIELDS.verifier, limit: 100 }),
-      eventRows(channel, { eventGroup: "admin", decodedFields: DECODED_FIELDS.admin, limit: 100 }),
-      eventRows(channel, { eventGroup: "upgrade", decodedFields: DECODED_FIELDS.upgrade, limit: 100 }),
+      eventRows(channel, { eventGroup: "policy", decodedFields: DECODED_FIELDS.policy, limit: eventListLimit(options) }),
+      eventRows(channel, { eventGroup: "transition", decodedFields: DECODED_FIELDS.transition, limit: eventListLimit(options) }),
+      eventRows(channel, { eventGroup: "verifier", decodedFields: DECODED_FIELDS.verifier, limit: eventListLimit(options) }),
+      eventRows(channel, { eventGroup: "admin", decodedFields: DECODED_FIELDS.admin, limit: eventListLimit(options) }),
+      eventRows(channel, { eventGroup: "upgrade", decodedFields: DECODED_FIELDS.upgrade, limit: eventListLimit(options) }),
     ]);
     lists.policyEvents = policyEvents;
     lists.transitionEvents = transitionEvents;
@@ -334,7 +335,7 @@ export async function getObserverDashboard(
       channelParticipantsCount: participantRows[0]?.active_count ?? "0",
       joinedParticipantsCount: participantRows[0]?.joined_count ?? "0",
       exitedParticipantsCount: participantRows[0]?.exited_count ?? "0",
-      realizedBurntToll: burntTollRows[0]?.realized_burnt_toll ?? "0",
+      realizedBurntToll: burntTollRows[0]?.realized_burnt_toll ?? null,
       eventCounts,
     },
     lists,
@@ -570,7 +571,15 @@ async function incidentRows(
 }
 
 function pageFor(options: ObserverDashboardOptions, listName: ObserverEventListName): ObserverEventListPage {
-  return options.eventListPages?.[listName] ?? { limit: 100, offset: 0 };
+  const page = options.eventListPages?.[listName] ?? { limit: eventListLimit(options), offset: 0 };
+  return {
+    limit: Math.min(page.limit, eventListLimit(options)),
+    offset: page.offset,
+  };
+}
+
+function eventListLimit(options: ObserverDashboardOptions) {
+  return Math.min(Math.max(options.eventListLimit ?? 100, 1), 500);
 }
 
 function emptyEventLists(): ObserverDashboard["lists"] {

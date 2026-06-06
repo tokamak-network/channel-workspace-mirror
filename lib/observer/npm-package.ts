@@ -8,13 +8,13 @@ type NpmLatestPackageResponse = {
 
 export const PRIVATE_STATE_CLI_NPM_URL = `https://www.npmjs.com/package/${PRIVATE_STATE_CLI_PACKAGE}`;
 
-export async function getPrivateStateCliLatestVersion() {
+export async function getPrivateStateCliLatestVersion(revalidateSeconds = 3600) {
   const response = await fetch(PRIVATE_STATE_CLI_REGISTRY_URL, {
     headers: {
       accept: "application/json",
     },
     next: {
-      revalidate: 3600,
+      revalidate: revalidateSeconds,
     },
   });
   if (!response.ok) {
