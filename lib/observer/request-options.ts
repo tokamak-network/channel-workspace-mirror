@@ -15,6 +15,7 @@ export function sectionDashboardOptions(
   costConfig: ResolvedObserverCostConfig,
   section: ObserverSection,
   eventListPages?: ObserverDashboardOptions["eventListPages"],
+  eventLists?: ObserverDashboardOptions["eventLists"],
 ): ObserverDashboardOptions {
   return {
     includeIncidents: incidentsForSection(costConfig, section),
@@ -22,6 +23,7 @@ export function sectionDashboardOptions(
     listMode: section === "events" ? "events" : section === "upgrades" ? "upgrades" : "none",
     eventListLimit: costConfig.eventListLimit,
     eventListPages,
+    eventLists,
   };
 }
 

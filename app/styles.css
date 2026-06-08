@@ -167,7 +167,8 @@ dd {
 }
 
 .event-count-summary a:hover,
-.event-count-summary a:focus-visible {
+.event-count-summary a:focus-visible,
+.event-count-summary a.active {
   background: #f8fafc;
 }
 

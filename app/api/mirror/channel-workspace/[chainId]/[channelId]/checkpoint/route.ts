@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mirrorRedirectCacheHeader } from "@/lib/cache-policy";
 import { latestCheckpointBlobUrl } from "@/lib/route-lookup";
 
 export const runtime = "nodejs";
@@ -22,6 +23,6 @@ export async function GET(_request: Request, context: RouteContext) {
 
 function redirectToBlob(url: string) {
   const response = NextResponse.redirect(url, 307);
-  response.headers.set("cache-control", "no-store");
+  response.headers.set("cache-control", mirrorRedirectCacheHeader());
   return response;
 }

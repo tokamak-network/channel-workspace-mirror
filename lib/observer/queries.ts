@@ -91,6 +91,7 @@ export type ObserverDashboardOptions = {
   includeParticipantAccounting?: boolean;
   eventListLimit?: number;
   eventListPages?: Partial<Record<ObserverEventListName, ObserverEventListPage>>;
+  eventLists?: ObserverEventListName[];
 };
 
 export type ObserverDashboard = {
@@ -249,40 +250,58 @@ export async function getObserverDashboard(
   const listTotals = { ...EMPTY_LIST_TOTALS };
 
   if (listMode === "all" || listMode === "events") {
-    const [
-      bridgeList,
-      participantRegistrationLists,
-      participantExitList,
-      storageList,
-      encryptedPayloadList,
-      privateStateList,
-    ] = await Promise.all([
-      eventListByGroups(channel, ["deposit", "withdrawal"], pageFor(options, "bridgeEvents"), DECODED_FIELDS.bridge),
-      participantRegistrationListRows(channel, options),
-      eventListRows(channel, { eventName: "ChannelTokenVaultIdentityExited", decodedFields: DECODED_FIELDS.participantExit, ...pageFor(options, "participantExitEvents") }),
-      eventListRows(channel, { eventName: "StorageKeyObserved", decodedFields: DECODED_FIELDS.commitment, ...pageFor(options, "commitmentEvents") }),
-      eventListRows(channel, { eventName: "NoteValueEncrypted", decodedFields: DECODED_FIELDS.encryptedPayload, ...pageFor(options, "encryptedPayloadEvents") }),
-      eventListByGroups(channel, ["transition", "l2_accounting"], pageFor(options, "privateStateEvents"), DECODED_FIELDS.privateState),
-    ]);
+    Object.assign(listTotals, await eventListTotals(channel));
+    const selectedLists = selectedEventLists(options, listMode);
 
-    lists.bridgeEvents = bridgeList.rows;
-    lists.participantJoinEvents = participantRegistrationLists.participantJoinEvents.rows;
-    lists.participantAddressPairEvents = participantRegistrationLists.participantAddressPairEvents.rows;
-    lists.participantPublicKeyEvents = participantRegistrationLists.participantPublicKeyEvents.rows;
-    lists.participantExitEvents = participantExitList.rows;
-    lists.commitmentEvents = storageList.rows;
-    lists.nullifierEvents = storageList.rows;
-    lists.encryptedPayloadEvents = encryptedPayloadList.rows;
-    lists.privateStateEvents = privateStateList.rows;
+    if (selectedLists.has("bridgeEvents")) {
+      lists.bridgeEvents = (await eventListByGroups(channel, ["deposit", "withdrawal"], pageFor(options, "bridgeEvents"), DECODED_FIELDS.bridge)).rows;
+    }
 
-    listTotals.bridgeEvents = bridgeList.totalCount;
-    listTotals.participantJoinEvents = participantRegistrationLists.participantJoinEvents.totalCount;
-    listTotals.participantAddressPairEvents = participantRegistrationLists.participantAddressPairEvents.totalCount;
-    listTotals.participantPublicKeyEvents = participantRegistrationLists.participantPublicKeyEvents.totalCount;
-    listTotals.participantExitEvents = participantExitList.totalCount;
-    listTotals.commitmentEvents = storageList.totalCount;
-    listTotals.encryptedPayloadEvents = encryptedPayloadList.totalCount;
-    listTotals.privateStateEvents = privateStateList.totalCount;
+    if (
+      selectedLists.has("participantJoinEvents")
+      || selectedLists.has("participantAddressPairEvents")
+      || selectedLists.has("participantPublicKeyEvents")
+    ) {
+      const participantRegistrationLists = await participantRegistrationListRows(channel, options);
+      lists.participantJoinEvents = participantRegistrationLists.participantJoinEvents.rows;
+      lists.participantAddressPairEvents = participantRegistrationLists.participantAddressPairEvents.rows;
+      lists.participantPublicKeyEvents = participantRegistrationLists.participantPublicKeyEvents.rows;
+    }
+
+    if (selectedLists.has("participantExitEvents")) {
+      lists.participantExitEvents = (await eventListRows(channel, {
+        eventName: "ChannelTokenVaultIdentityExited",
+        decodedFields: DECODED_FIELDS.participantExit,
+        ...pageFor(options, "participantExitEvents"),
+      })).rows;
+    }
+
+    if (selectedLists.has("commitmentEvents")) {
+      const storageList = await eventListRows(channel, {
+        eventName: "StorageKeyObserved",
+        decodedFields: DECODED_FIELDS.commitment,
+        ...pageFor(options, "commitmentEvents"),
+      });
+      lists.commitmentEvents = storageList.rows;
+      lists.nullifierEvents = storageList.rows;
+    }
+
+    if (selectedLists.has("encryptedPayloadEvents")) {
+      lists.encryptedPayloadEvents = (await eventListRows(channel, {
+        eventName: "NoteValueEncrypted",
+        decodedFields: DECODED_FIELDS.encryptedPayload,
+        ...pageFor(options, "encryptedPayloadEvents"),
+      })).rows;
+    }
+
+    if (selectedLists.has("privateStateEvents")) {
+      lists.privateStateEvents = (await eventListByGroups(
+        channel,
+        ["transition", "l2_accounting"],
+        pageFor(options, "privateStateEvents"),
+        DECODED_FIELDS.privateState,
+      )).rows;
+    }
   }
 
   if (listMode === "all" || listMode === "upgrades") {
@@ -375,6 +394,40 @@ async function participantRegistrationListRows(
     participantJoinEvents,
     participantAddressPairEvents,
     participantPublicKeyEvents,
+  };
+}
+
+async function eventListTotals(channel: ObserverChannelRow) {
+  const sql = getSql();
+  const rows = await sql`
+    select
+      count(*) filter (where event_group = any(${["deposit", "withdrawal"]}::text[]))::text as bridge_events,
+      count(*) filter (where event_name = 'ChannelTokenVaultIdentityRegistered')::text as participant_registration_events,
+      count(*) filter (where event_name = 'ChannelTokenVaultIdentityExited')::text as participant_exit_events,
+      count(*) filter (where event_name = 'StorageKeyObserved')::text as commitment_events,
+      count(*) filter (where event_name = 'NoteValueEncrypted')::text as encrypted_payload_events,
+      count(*) filter (where event_group = any(${["transition", "l2_accounting"]}::text[]))::text as private_state_events
+    from observer_events
+    where chain_id = ${channel.chain_id}::bigint
+      and channel_id = ${channel.channel_id}
+  ` as unknown as {
+    bridge_events: string;
+    participant_registration_events: string;
+    participant_exit_events: string;
+    commitment_events: string;
+    encrypted_payload_events: string;
+    private_state_events: string;
+  }[];
+  const row = rows[0];
+  return {
+    bridgeEvents: row?.bridge_events ?? "0",
+    participantJoinEvents: row?.participant_registration_events ?? "0",
+    participantAddressPairEvents: row?.participant_registration_events ?? "0",
+    participantPublicKeyEvents: row?.participant_registration_events ?? "0",
+    participantExitEvents: row?.participant_exit_events ?? "0",
+    commitmentEvents: row?.commitment_events ?? "0",
+    encryptedPayloadEvents: row?.encrypted_payload_events ?? "0",
+    privateStateEvents: row?.private_state_events ?? "0",
   };
 }
 
@@ -607,6 +660,13 @@ function pageFor(options: ObserverDashboardOptions, listName: ObserverEventListN
     limit: Math.min(page.limit, eventListLimit(options)),
     offset: page.offset,
   };
+}
+
+function selectedEventLists(options: ObserverDashboardOptions, listMode: ObserverDashboardOptions["listMode"]) {
+  if (options.eventLists) {
+    return new Set(options.eventLists);
+  }
+  return new Set<ObserverEventListName>(listMode === "all" ? Object.keys(EMPTY_LIST_TOTALS) as ObserverEventListName[] : []);
 }
 
 function samePage(left: ObserverEventListPage, right: ObserverEventListPage) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mirrorRedirectCacheHeader } from "@/lib/cache-policy";
 import { blobUrlForPublicPath } from "@/lib/route-lookup";
 
 export const runtime = "nodejs";
@@ -15,11 +16,6 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   const { mirrorPath } = await context.params;
   const publicPath = mirrorPath.join("/");
-  if (publicPath === "robots.txt") {
-    return new Response("User-agent: *\nAllow: /\n", {
-      headers: { "content-type": "text/plain; charset=utf-8" },
-    });
-  }
   if (NOT_MIRROR_PATHS.has(publicPath)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -28,6 +24,6 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Mirror artifact not found" }, { status: 404 });
   }
   const response = NextResponse.redirect(url, 307);
-  response.headers.set("cache-control", "no-store");
+  response.headers.set("cache-control", mirrorRedirectCacheHeader());
   return response;
 }

@@ -3,6 +3,12 @@ import { getCachedObserverCostConfig, getCachedObserverDashboard } from "@/lib/o
 import { overviewDashboardOptions } from "@/lib/observer/request-options";
 import { ObserverOverview } from "./observer-view";
 
+export const revalidate = 3600;
+
+export function generateStaticParams() {
+  return [{ slug: "the-great-first-channel" }];
+}
+
 export default async function ObserverChannelPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const costConfig = await getCachedObserverCostConfig(slug);

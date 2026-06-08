@@ -7,12 +7,16 @@ export const metadata: Metadata = {
   description: "Reusable channel workspace mirror server with public channel observer views",
 };
 
+const enableVercelAnalytics =
+  process.env.ENABLE_VERCEL_ANALYTICS === "true"
+  || process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === "true";
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body>
         {children}
-        <Analytics />
+        {enableVercelAnalytics ? <Analytics /> : null}
       </body>
     </html>
   );

@@ -2,7 +2,7 @@ import { unstable_cache } from "next/cache";
 import { getObserverDashboard, getObserverEvents, type ObserverDashboardOptions } from "./queries";
 import { getResolvedObserverCostConfig, type ResolvedObserverCostConfig } from "./cost-config";
 
-const COST_CONFIG_CACHE_SECONDS = 300;
+const COST_CONFIG_CACHE_SECONDS = 3600;
 
 export function getCachedObserverCostConfig(channelSlug: string) {
   return unstable_cache(

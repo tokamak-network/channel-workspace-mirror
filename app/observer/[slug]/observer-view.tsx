@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { PRIVATE_STATE_CLI_NPM_URL } from "@/lib/observer/npm-package";
-import type { ObserverDashboard, ObserverEventRow, ObserverIncidentRow } from "@/lib/observer/queries";
+import type { ObserverDashboard, ObserverEventListName, ObserverEventRow, ObserverIncidentRow } from "@/lib/observer/queries";
 import { CopyableValue } from "./copyable-value";
 
 type SectionId = "channel" | "bridge" | "participants" | "events" | "upgrades" | "notices";
@@ -126,11 +126,13 @@ export function ObserverSectionPage({
   dashboard,
   sectionId,
   searchParams = {},
+  selectedEventList = null,
   npmPackageVersion = null,
 }: {
   dashboard: ObserverDashboard;
   sectionId: SectionId;
   searchParams?: ObserverSearchParams;
+  selectedEventList?: ObserverEventListName | null;
   npmPackageVersion?: string | null;
 }) {
   const section = observerSections.find((item) => item.id === sectionId);
@@ -151,6 +153,7 @@ export function ObserverSectionPage({
           dashboard={dashboard}
           sectionId={sectionId}
           searchParams={searchParams}
+          selectedEventList={selectedEventList}
           npmPackageVersion={npmPackageVersion ?? null}
         />
       </ObserverSection>
@@ -211,11 +214,13 @@ function SectionDetail({
   dashboard,
   sectionId,
   searchParams,
+  selectedEventList,
   npmPackageVersion,
 }: {
   dashboard: ObserverDashboard;
   sectionId: SectionId;
   searchParams: ObserverSearchParams;
+  selectedEventList: ObserverEventListName | null;
   npmPackageVersion: string | null;
 }) {
   const { channel, stats, lists } = dashboard;
@@ -340,41 +345,49 @@ function SectionDetail({
   if (sectionId === "events") {
     const eventCountSections = [
       {
+        listName: "bridgeEvents" as const,
         id: "bridge-event-list",
         title: "Bridge deposits, withdrawals, tolls, and refunds (TON amounts)",
         count: dashboard.listTotals.bridgeEvents,
       },
       {
+        listName: "participantJoinEvents" as const,
         id: "participant-join-event-list",
         title: "Channel joins",
         count: dashboard.listTotals.participantJoinEvents,
       },
       {
+        listName: "participantAddressPairEvents" as const,
         id: "participant-address-pair-event-list",
         title: "Registered L1 / L2 address pairs",
         count: dashboard.listTotals.participantAddressPairEvents,
       },
       {
+        listName: "participantPublicKeyEvents" as const,
         id: "participant-public-key-event-list",
         title: "Note-receive public keys",
         count: dashboard.listTotals.participantPublicKeyEvents,
       },
       {
+        listName: "participantExitEvents" as const,
         id: "participant-exit-event-list",
         title: "Channel exits",
         count: dashboard.listTotals.participantExitEvents,
       },
       {
+        listName: "privateStateEvents" as const,
         id: "transition-accounting-event-list",
         title: "Accepted transitions and storage/accounting signals",
         count: dashboard.listTotals.privateStateEvents,
       },
       {
+        listName: "commitmentEvents" as const,
         id: "commitment-event-list",
         title: "Commitments and nullifiers",
         count: dashboard.listTotals.commitmentEvents,
       },
       {
+        listName: "encryptedPayloadEvents" as const,
         id: "encrypted-payload-event-list",
         title: "Encrypted payloads",
         count: dashboard.listTotals.encryptedPayloadEvents,
@@ -383,8 +396,13 @@ function SectionDetail({
     return (
       <>
         <DetailSection id="event-counts" title="Event Counts">
-          <EventCountSummary items={eventCountSections} />
+          <EventCountSummary
+            basePath={eventPagePath}
+            items={eventCountSections}
+            selectedEventList={selectedEventList}
+          />
         </DetailSection>
+        {selectedEventList === "bridgeEvents" ? (
         <DetailSection id="bridge-events" title="Bridge Events">
           <EventTable
             id="bridge-event-list"
@@ -397,7 +415,9 @@ function SectionDetail({
             basePath={eventPagePath}
           />
         </DetailSection>
-        <DetailSection id="participant-events" title="Participant Events">
+        ) : null}
+        {selectedEventList === "participantJoinEvents" ? (
+        <DetailSection id="participant-joins" title="Participant Joins">
           <EventTable
             id="participant-join-event-list"
             title="Channel joins"
@@ -409,6 +429,10 @@ function SectionDetail({
             searchParams={searchParams}
             basePath={eventPagePath}
           />
+        </DetailSection>
+        ) : null}
+        {selectedEventList === "participantAddressPairEvents" ? (
+        <DetailSection id="participant-address-pairs" title="Participant Address Pairs">
           <EventTable
             id="participant-address-pair-event-list"
             title="Registered L1 / L2 address pairs"
@@ -420,6 +444,10 @@ function SectionDetail({
             searchParams={searchParams}
             basePath={eventPagePath}
           />
+        </DetailSection>
+        ) : null}
+        {selectedEventList === "participantPublicKeyEvents" ? (
+        <DetailSection id="participant-public-keys" title="Participant Public Keys">
           <EventTable
             id="participant-public-key-event-list"
             title="Note-receive public keys"
@@ -431,6 +459,10 @@ function SectionDetail({
             searchParams={searchParams}
             basePath={eventPagePath}
           />
+        </DetailSection>
+        ) : null}
+        {selectedEventList === "participantExitEvents" ? (
+        <DetailSection id="participant-exits" title="Participant Exits">
           <EventTable
             id="participant-exit-event-list"
             title="Channel exits"
@@ -443,6 +475,8 @@ function SectionDetail({
             basePath={eventPagePath}
           />
         </DetailSection>
+        ) : null}
+        {selectedEventList === "privateStateEvents" ? (
         <DetailSection id="private-state-events" title="Private-State Public Signal Events">
           <EventTable
             id="transition-accounting-event-list"
@@ -454,6 +488,10 @@ function SectionDetail({
             searchParams={searchParams}
             basePath={eventPagePath}
           />
+        </DetailSection>
+        ) : null}
+        {selectedEventList === "commitmentEvents" ? (
+        <DetailSection id="commitment-events" title="Commitments and Nullifiers">
           <EventTable
             id="commitment-event-list"
             title="Commitments and nullifiers"
@@ -464,6 +502,10 @@ function SectionDetail({
             searchParams={searchParams}
             basePath={eventPagePath}
           />
+        </DetailSection>
+        ) : null}
+        {selectedEventList === "encryptedPayloadEvents" ? (
+        <DetailSection id="encrypted-payload-events" title="Encrypted Payloads">
           <EventTable
             id="encrypted-payload-event-list"
             title="Encrypted payloads"
@@ -475,6 +517,7 @@ function SectionDetail({
             basePath={eventPagePath}
           />
         </DetailSection>
+        ) : null}
       </>
     );
   }
@@ -615,17 +658,26 @@ function DataIssueNotice({ message }: { message?: string | null }) {
 }
 
 function EventCountSummary({
+  basePath,
   items,
+  selectedEventList,
 }: {
-  items: Array<{ id: string; title: string; count: string }>;
+  basePath: string;
+  items: Array<{ listName: ObserverEventListName; id: string; title: string; count: string }>;
+  selectedEventList: ObserverEventListName | null;
 }) {
   return (
     <nav className="event-count-summary" aria-label="Event count section links">
       {items.map((item) => (
-        <a href={`#${item.id}`} key={item.id}>
+        <Link
+          className={selectedEventList === item.listName ? "active" : undefined}
+          href={`${basePath}/${item.listName}#${item.id}`}
+          key={item.id}
+          prefetch={false}
+        >
           <span>{item.title}</span>
           <strong>{item.count}</strong>
-        </a>
+        </Link>
       ))}
     </nav>
   );
