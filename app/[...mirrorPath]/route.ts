@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mirrorRedirectCacheHeader } from "@/lib/cache-policy";
+import { mirrorRedirectCacheHeaders } from "@/lib/cache-policy";
 import { blobUrlForPublicPath } from "@/lib/route-lookup";
 
 export const runtime = "nodejs";
@@ -24,6 +24,8 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Mirror artifact not found" }, { status: 404 });
   }
   const response = NextResponse.redirect(url, 307);
-  response.headers.set("cache-control", mirrorRedirectCacheHeader());
+  for (const [key, value] of Object.entries(mirrorRedirectCacheHeaders())) {
+    response.headers.set(key, value);
+  }
   return response;
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mirrorRedirectCacheHeader } from "@/lib/cache-policy";
+import { mirrorRedirectCacheHeaders } from "@/lib/cache-policy";
 import { latestManifestBlobUrl } from "@/lib/route-lookup";
 
 export const runtime = "nodejs";
@@ -23,6 +23,8 @@ export async function GET(_request: Request, context: RouteContext) {
 
 function redirectToBlob(url: string) {
   const response = NextResponse.redirect(url, 307);
-  response.headers.set("cache-control", mirrorRedirectCacheHeader());
+  for (const [key, value] of Object.entries(mirrorRedirectCacheHeaders())) {
+    response.headers.set(key, value);
+  }
   return response;
 }

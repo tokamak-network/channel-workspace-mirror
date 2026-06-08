@@ -5,6 +5,9 @@ export function publicCacheHeader(ttlSeconds: number, staleWhileRevalidateSecond
   return `public, s-maxage=${ttlSeconds}, stale-while-revalidate=${staleWhileRevalidateSeconds}`;
 }
 
-export function mirrorRedirectCacheHeader() {
-  return publicCacheHeader(MIRROR_REDIRECT_CACHE_SECONDS, MIRROR_REDIRECT_STALE_SECONDS);
+export function mirrorRedirectCacheHeaders() {
+  return {
+    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Vercel-CDN-Cache-Control": `max-age=${MIRROR_REDIRECT_CACHE_SECONDS}, stale-while-revalidate=${MIRROR_REDIRECT_STALE_SECONDS}`,
+  };
 }

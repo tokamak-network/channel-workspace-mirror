@@ -3,7 +3,7 @@ import { test } from "node:test";
 import {
   MIRROR_REDIRECT_CACHE_SECONDS,
   MIRROR_REDIRECT_STALE_SECONDS,
-  mirrorRedirectCacheHeader,
+  mirrorRedirectCacheHeaders,
   publicCacheHeader,
 } from "../lib/cache-policy";
 
@@ -13,8 +13,8 @@ test("formats public CDN cache headers", () => {
 });
 
 test("formats mirror redirect cache policy", () => {
-  assert.equal(
-    mirrorRedirectCacheHeader(),
-    `public, s-maxage=${MIRROR_REDIRECT_CACHE_SECONDS}, stale-while-revalidate=${MIRROR_REDIRECT_STALE_SECONDS}`,
-  );
+  assert.deepEqual(mirrorRedirectCacheHeaders(), {
+    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Vercel-CDN-Cache-Control": `max-age=${MIRROR_REDIRECT_CACHE_SECONDS}, stale-while-revalidate=${MIRROR_REDIRECT_STALE_SECONDS}`,
+  });
 });
