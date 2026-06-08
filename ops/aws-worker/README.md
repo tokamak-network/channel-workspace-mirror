@@ -58,10 +58,11 @@ The bootstrap script installs:
 - `channel-workspace-mirror-indexer.service`
 - `channel-workspace-mirror-indexer.timer`
 
-The repository-managed timer keeps the five minute observer cadence and also wakes the worker at
-`07:00 UTC`, which is 15:00 in Asia/Singapore. It does not use a separate boot-only first-run timer.
-Each wake attempts CLI recovery and observer sync. Mirror publishing runs once per Singapore
-calendar day at the first worker execution at or after 15:00 Asia/Singapore.
+The repository-managed timer uses the resolved observer cost profile sync interval for
+`OnUnitInactiveSec` and also wakes the worker at `07:00 UTC`, which is 15:00 in Asia/Singapore. It
+does not use a separate boot-only first-run timer. Each wake attempts CLI recovery and observer sync.
+Mirror publishing runs once per Singapore calendar day at the first worker execution at or after
+15:00 Asia/Singapore.
 
 Useful commands:
 
@@ -88,7 +89,8 @@ The update script:
 - makes `channelmirror` the owner of `/opt/channel-workspace-mirror`
 - fetches and resets the checkout to the configured branch
 - runs `npm ci`
-- installs the repository-managed systemd service and timer units
+- resolves the observer sync interval from production runtime config
+- installs the repository-managed systemd service and rendered timer units
 - reloads systemd and enables the timer
 
 Secrets remain in `/etc/channel-workspace-mirror.env`; the update script does not print or replace

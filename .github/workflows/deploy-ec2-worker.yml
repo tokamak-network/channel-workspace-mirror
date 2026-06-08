@@ -62,7 +62,9 @@ jobs:
           ssh -p "${{ vars.EC2_PORT }}" -i ~/.ssh/ec2_worker_key "${{ vars.EC2_USER }}@${{ vars.EC2_HOST }}" '
             set -euo pipefail
             systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnCalendar=\\*-\\*-\\* 07:00:00 UTC"
-            systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnUnitInactiveSec=5min"
+            expected_interval="$(sudo bash -lc "set -a; source /etc/channel-workspace-mirror.env; set +a; cd /opt/channel-workspace-mirror; npm run --silent observer:timer-interval")"
+            systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnUnitInactiveSec=${expected_interval}"
+            ! systemctl cat channel-workspace-mirror-indexer.timer | grep -q "__OBSERVER_SYNC_INTERVAL__"
             ! systemctl cat channel-workspace-mirror-indexer.timer | grep -q "OnBootSec"
             test "$(stat -c "%U:%G" /opt/channel-workspace-mirror)" = "channelmirror:channelmirror"
           '

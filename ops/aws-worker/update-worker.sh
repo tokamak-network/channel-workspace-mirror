@@ -60,12 +60,22 @@ fi
 chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 sudo -u "${APP_USER}" npm --prefix "${APP_DIR}" ci
 
+observer_sync_interval="$(npm --prefix "${APP_DIR}" run --silent observer:timer-interval)"
+if [[ ! "${observer_sync_interval}" =~ ^[0-9]+(s|min|h)$ ]]; then
+  echo "Invalid observer sync interval resolved from runtime config: ${observer_sync_interval}" >&2
+  exit 1
+fi
+
 install -o root -g root -m 0644 "${APP_DIR}/ops/aws-worker/${SERVICE_UNIT}" "/etc/systemd/system/${SERVICE_UNIT}"
-install -o root -g root -m 0644 "${APP_DIR}/ops/aws-worker/${TIMER_UNIT}" "/etc/systemd/system/${TIMER_UNIT}"
+sed "s/__OBSERVER_SYNC_INTERVAL__/${observer_sync_interval}/g" "${APP_DIR}/ops/aws-worker/${TIMER_UNIT}" \
+  > "/tmp/${TIMER_UNIT}"
+install -o root -g root -m 0644 "/tmp/${TIMER_UNIT}" "/etc/systemd/system/${TIMER_UNIT}"
+rm -f "/tmp/${TIMER_UNIT}"
 
 systemctl daemon-reload
 systemctl enable --now "${TIMER_UNIT}"
 
 echo "Updated ${APP_NAME} worker to $(sudo -u "${APP_USER}" git -C "${APP_DIR}" rev-parse --short HEAD)."
+echo "Observer sync timer interval: ${observer_sync_interval}"
 echo "Timer policy:"
 systemctl cat "${TIMER_UNIT}"

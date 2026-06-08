@@ -1,9 +1,9 @@
 [Unit]
-Description=Run channel workspace mirror indexer every five minutes and at daily mirror publish time
+Description=Run channel workspace mirror indexer at observer sync cadence and daily mirror publish time
 
 [Timer]
 OnCalendar=*-*-* 07:00:00 UTC
-OnUnitInactiveSec=5min
+OnUnitInactiveSec=__OBSERVER_SYNC_INTERVAL__
 AccuracySec=1s
 Unit=channel-workspace-mirror-indexer.service
 
