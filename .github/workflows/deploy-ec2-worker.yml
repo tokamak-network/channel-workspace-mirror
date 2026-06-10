@@ -51,7 +51,16 @@ jobs:
       - name: Deploy worker
         run: |
           set -euo pipefail
-          ssh-keyscan -p "${{ vars.EC2_PORT }}" "${{ vars.EC2_HOST }}" >> ~/.ssh/known_hosts
+          for attempt in {1..12}; do
+            if ssh-keyscan -T 10 -p "${{ vars.EC2_PORT }}" "${{ vars.EC2_HOST }}" >> ~/.ssh/known_hosts; then
+              break
+            fi
+            if [ "${attempt}" -eq 12 ]; then
+              echo "EC2 SSH did not become reachable after ${attempt} attempts." >&2
+              exit 1
+            fi
+            sleep 5
+          done
           scp -P "${{ vars.EC2_PORT }}" -i ~/.ssh/ec2_worker_key ops/aws-worker/update-worker.sh "${{ vars.EC2_USER }}@${{ vars.EC2_HOST }}:/tmp/channel-workspace-mirror-update-worker.sh"
           ssh -p "${{ vars.EC2_PORT }}" -i ~/.ssh/ec2_worker_key "${{ vars.EC2_USER }}@${{ vars.EC2_HOST }}" \
             'sudo bash /tmp/channel-workspace-mirror-update-worker.sh && rm -f /tmp/channel-workspace-mirror-update-worker.sh'
