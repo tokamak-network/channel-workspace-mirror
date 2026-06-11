@@ -3,6 +3,8 @@ import { getObserverDashboard, getObserverEvents, type ObserverDashboardOptions 
 import { getResolvedObserverCostConfig, type ResolvedObserverCostConfig } from "./cost-config";
 
 const COST_CONFIG_CACHE_SECONDS = 3600;
+const OBSERVER_DASHBOARD_CACHE_VERSION = "observer-dashboard-v2";
+const OBSERVER_EVENTS_CACHE_VERSION = "observer-events-v2";
 
 export function getCachedObserverCostConfig(channelSlug: string) {
   return unstable_cache(
@@ -21,7 +23,7 @@ export function getCachedObserverDashboard(
   const ttl = cacheKind === "api" ? costConfig.apiCacheTtlSeconds : costConfig.pageCacheTtlSeconds;
   return unstable_cache(
     () => getObserverDashboard(slug, options),
-    ["observer-dashboard", slug, cacheKind, stableCacheKey({ options, costConfig })],
+    [OBSERVER_DASHBOARD_CACHE_VERSION, slug, cacheKind, stableCacheKey({ options, costConfig })],
     { revalidate: ttl },
   )();
 }
@@ -33,7 +35,7 @@ export function getCachedObserverEvents(
 ) {
   return unstable_cache(
     () => getObserverEvents(slug, filters),
-    ["observer-events", slug, stableCacheKey({ filters, costConfig })],
+    [OBSERVER_EVENTS_CACHE_VERSION, slug, stableCacheKey({ filters, costConfig })],
     { revalidate: costConfig.apiCacheTtlSeconds },
   )();
 }

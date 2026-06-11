@@ -29,6 +29,8 @@ create table if not exists observer_channels (
   bridge_core_implementation text,
   bridge_token_vault_implementation text,
   current_join_toll text,
+  join_toll_burn_address text,
+  channel_operation_abandoned_at timestamptz,
   toll_refund_cutoff1_seconds text,
   toll_refund_cutoff2_seconds text,
   toll_refund_cutoff3_seconds text,

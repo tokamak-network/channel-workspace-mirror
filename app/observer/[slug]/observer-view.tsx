@@ -76,11 +76,15 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
           <p>
             Public status for users, operators, and dispute reviewers. Detailed evidence is separated by category.
           </p>
+          {channel.channel_operation_abandoned_at ? (
+            <p className="section-note">{operationStatusScopeText()}</p>
+          ) : null}
         </div>
         <dl className="summary-list">
           <InfoItem label="Sync height" value={hasDataIssue ? unavailable : sync.lastScannedBlock ?? "not synced"} />
           <InfoItem label="Latest L1 height" value={hasDataIssue ? unavailable : sync.latestBlock ?? "not synced"} />
           <InfoItem label="Last indexed" value={hasDataIssue ? unavailable : formatDate(sync.updatedAt)} />
+          <InfoItem label="Operation status" value={formatOperationStatus(channel)} />
           <InfoItem label="Latest transition" value={latestBlock} />
         </dl>
       </section>
@@ -96,6 +100,7 @@ export function ObserverOverview({ dashboard }: { dashboard: ObserverDashboard }
         <OverviewBlock title="Channel Profile" href={`/observer/${channel.slug}/channel`}>
           <InfoItem label="Channel ID" value={channel.channel_id} mono />
           <InfoItem label="DApp ID" value={channel.dapp_id} mono />
+          <InfoItem label="Operation status" value={formatOperationStatus(channel)} />
         </OverviewBlock>
         <OverviewBlock title="Bridge Status" href={`/observer/${channel.slug}/bridge`}>
           <InfoItem label="Deposits (TON)" value={hasDataIssue ? unavailable : formatTokenAmount(stats.totalL1BridgeDeposits)} />
@@ -268,7 +273,10 @@ function SectionDetail({
             <InfoItem label="DApp metadata schema" value={channel.dapp_metadata_digest_schema ?? "unknown"} mono />
             <InfoItem label="Current root vector hash" value={channel.current_root_vector_hash ?? "unknown"} mono />
             <InfoItem label="Current join toll (TON)" value={formatTokenAmount(channel.current_join_toll ?? "0")} />
+            <InfoItem label="Join toll burn address" value={channel.join_toll_burn_address ?? "not indexed"} mono />
+            <InfoItem label="Operation status" value={formatOperationStatus(channel)} />
             <InfoItem label="Toll refund policy" value={<TollRefundPolicy channel={channel} />} wide />
+            <InfoItem label="Operation scope" value={operationStatusScopeText()} wide />
           </InfoGrid>
         </DetailSection>
         <DetailSection title="Source & Artifacts">
@@ -302,7 +310,7 @@ function SectionDetail({
         </DetailSection>
         <DetailSection title="Event Log Link">
           <p className="section-note">
-            Deposit, withdrawal, join toll, and exit refund events are listed under <Link href={`/observer/${channel.slug}/events`} prefetch={false}>Event Logs</Link>.
+            Deposit, withdrawal, join toll, exit refund, and non-refundable toll transfer events are listed under <Link href={`/observer/${channel.slug}/events`} prefetch={false}>Event Logs</Link>.
           </p>
         </DetailSection>
       </>
@@ -317,7 +325,7 @@ function SectionDetail({
             <InfoItem label="Active participants" value={stats.channelParticipantsCount} />
             <InfoItem label="Joined participants" value={stats.joinedParticipantsCount} />
             <InfoItem label="Exited participants" value={stats.exitedParticipantsCount} />
-            <InfoItem label="Burnt toll (TON)" value={stats.realizedBurntToll === null ? "Not loaded" : formatTokenAmount(stats.realizedBurntToll)} />
+            <InfoItem label="Non-refundable toll (TON)" value={stats.realizedBurntToll === null ? "Not loaded" : formatTokenAmount(stats.realizedBurntToll)} />
             <InfoItem label="Channel ID" value={channel.channel_id} mono />
             <InfoItem label="DApp ID" value={channel.dapp_id} mono />
             <InfoItem label="Leader" value={channel.leader ?? "unknown"} mono />
@@ -347,7 +355,7 @@ function SectionDetail({
       {
         listName: "bridgeEvents" as const,
         id: "bridge-event-list",
-        title: "Bridge deposits, withdrawals, tolls, and refunds (TON amounts)",
+        title: "Bridge deposits, withdrawals, tolls, refunds, and non-refundable toll transfers (TON amounts)",
         count: dashboard.listTotals.bridgeEvents,
       },
       {
@@ -406,7 +414,7 @@ function SectionDetail({
         <DetailSection id="bridge-events" title="Bridge Events">
           <EventTable
             id="bridge-event-list"
-            title="Bridge deposits, withdrawals, tolls, and refunds (TON amounts)"
+            title="Bridge deposits, withdrawals, tolls, refunds, and non-refundable toll transfers (TON amounts)"
             events={lists.bridgeEvents}
             displayLimit={15}
             totalCount={dashboard.listTotals.bridgeEvents}
@@ -755,24 +763,30 @@ function TollRefundPolicy({ channel }: { channel: ObserverChannel }) {
     return "invalid policy snapshot";
   }
   return (
-    <table className="toll-policy-table">
-      <thead>
-        <tr>
-          <th>Exit timing</th>
-          <th>Refunded</th>
-          <th>Burnt</th>
-        </tr>
-      </thead>
-      <tbody>
-        {schedule.map((item) => (
-          <tr key={item.label}>
-            <td>{item.label}</td>
-            <td>{formatBpsPercent(item.refundBps)}</td>
-            <td>{formatBpsPercent(10000n - item.refundBps)}</td>
+    <>
+      <table className="toll-policy-table">
+        <thead>
+          <tr>
+            <th>Exit timing</th>
+            <th>Refunded</th>
+            <th>Non-refundable</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {schedule.map((item) => (
+            <tr key={item.label}>
+              <td>{item.label}</td>
+              <td>{formatBpsPercent(item.refundBps)}</td>
+              <td>{formatBpsPercent(10000n - item.refundBps)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="section-note">
+        The non-refundable portion is transferred to the configured burn address
+        {channel.join_toll_burn_address ? <>: <CopyableValue displayValue={shortHash(channel.join_toll_burn_address)} value={channel.join_toll_burn_address} /></> : " when indexed"}.
+      </p>
+    </>
   );
 }
 
@@ -1037,6 +1051,16 @@ function formatDate(value: string | null) {
     timeStyle: "medium",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function formatOperationStatus(channel: ObserverChannel) {
+  return channel.channel_operation_abandoned_at
+    ? `Abandoned at ${formatDate(channel.channel_operation_abandoned_at)}`
+    : "Active";
+}
+
+function operationStatusScopeText() {
+  return "Abandonment only makes new join and deposit-channel operations unavailable; note activity, redeem, withdraw, and exit remain available.";
 }
 
 function formatTokenAmount(value: string) {

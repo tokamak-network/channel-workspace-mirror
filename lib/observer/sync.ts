@@ -79,11 +79,13 @@ const TARGETED_EVENTS = [
   { addressKey: "bridgeTokenVault", eventName: "AssetsClaimed" },
   { addressKey: "bridgeTokenVault", eventName: "ChannelJoinTollPaid" },
   { addressKey: "bridgeTokenVault", eventName: "ChannelExitRefunded" },
+  { addressKey: "bridgeTokenVault", eventName: "ChannelExitTollBurned" },
+  { addressKey: "bridgeTokenVault", eventName: "ChannelOperationAbandoned" },
   { addressKey: "bridgeTokenVault", eventName: "Upgraded" },
   { addressKey: "bridgeTokenVault", eventName: "OwnershipTransferred" },
 ] as const;
 
-export const TARGETED_EVENT_SYNC_KEY = "targeted-observer-events-v1";
+export const TARGETED_EVENT_SYNC_KEY = "targeted-observer-events-v2";
 
 const currentStateAbi = parseAbi([
   "function bridgeTokenVault() view returns (address)",
@@ -106,6 +108,8 @@ const currentStateAbi = parseAbi([
   "function joinTollRefundBps2() view returns (uint16)",
   "function joinTollRefundBps3() view returns (uint16)",
   "function joinTollRefundBps4() view returns (uint16)",
+  "function JOIN_TOLL_BURN_ADDRESS() view returns (address)",
+  "function channelOperationAbandonedAt(uint256 channelId) view returns (uint64)",
   "function grothVerifierCompatibleBackendVersion() view returns (string)",
   "function tokamakVerifierCompatibleBackendVersion() view returns (string)",
   "function getDAppInfo(uint256 dappId) view returns ((bool exists,bytes32 labelHash,uint256 channelTokenVaultTreeIndex,bytes32 metadataDigestSchema,bytes32 metadataDigest,bytes32 functionRoot))",
@@ -347,6 +351,8 @@ async function refreshChannelCurrentState(
     channelFunctionRoot,
     currentRootVectorHash,
     currentJoinToll,
+    joinTollBurnAddress,
+    channelOperationAbandonedAtSeconds,
     tollRefundCutoff1,
     tollRefundCutoff2,
     tollRefundCutoff3,
@@ -364,6 +370,8 @@ async function refreshChannelCurrentState(
     readHexString(client, limiter, channel.channelManager, "functionRoot"),
     readHexString(client, limiter, channel.channelManager, "currentRootVectorHash"),
     readUnsignedInteger(client, limiter, channel.channelManager, "joinToll"),
+    readAddress(client, limiter, channel.bridgeTokenVault, "JOIN_TOLL_BURN_ADDRESS"),
+    readUnsignedInteger(client, limiter, channel.bridgeTokenVault, "channelOperationAbandonedAt", [BigInt(channel.channelId)]),
     readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundCutoff1"),
     readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundCutoff2"),
     readUnsignedInteger(client, limiter, channel.channelManager, "joinTollRefundCutoff3"),
@@ -405,6 +413,10 @@ async function refreshChannelCurrentState(
   }
 
   const sql = getSql();
+  const channelOperationAbandonedAt = unixSecondsToIsoTimestamp(
+    channelOperationAbandonedAtSeconds,
+    "channelOperationAbandonedAt",
+  );
   await sql`
     update observer_channels
     set
@@ -422,6 +434,8 @@ async function refreshChannelCurrentState(
       bridge_core_implementation = ${bridgeCoreImplementation},
       bridge_token_vault_implementation = ${bridgeTokenVaultImplementation},
       current_join_toll = ${currentJoinToll.toString()},
+      join_toll_burn_address = ${joinTollBurnAddress},
+      channel_operation_abandoned_at = ${channelOperationAbandonedAt}::timestamptz,
       toll_refund_cutoff1_seconds = ${tollRefundCutoff1.toString()},
       toll_refund_cutoff2_seconds = ${tollRefundCutoff2.toString()},
       toll_refund_cutoff3_seconds = ${tollRefundCutoff3.toString()},
@@ -618,6 +632,20 @@ function requiredStringField(row: Record<string, unknown> & readonly unknown[], 
 
 function lowerAddress(address: string) {
   return address.toLowerCase();
+}
+
+function unixSecondsToIsoTimestamp(value: bigint, functionName: string) {
+  if (value === 0n) {
+    return null;
+  }
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`RPC ${functionName} returned a timestamp outside the supported JavaScript range.`);
+  }
+  const date = new Date(Number(value) * 1000);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`RPC ${functionName} returned an invalid timestamp.`);
+  }
+  return date.toISOString();
 }
 
 async function importRawRpcCallHistory({
@@ -917,8 +945,16 @@ function isRelevantDecodedEvent(
   if (eventName === "ChannelCreated" || eventName === "ChannelWorkspaceMirrorUpdated") {
     return lowerAddress === channel.bridgeCore.toLowerCase();
   }
-  if (eventName === "ChannelJoinTollPaid" || eventName === "ChannelExitRefunded" || eventName === "StorageWriteObserved") {
+  if (
+    eventName === "ChannelJoinTollPaid"
+    || eventName === "ChannelExitRefunded"
+    || eventName === "ChannelExitTollBurned"
+    || eventName === "StorageWriteObserved"
+  ) {
     return lowerAddress === channel.bridgeTokenVault.toLowerCase();
+  }
+  if (eventName === "ChannelOperationAbandoned") {
+    return lowerAddress === channel.bridgeTokenVault.toLowerCase() || lowerAddress === channel.bridgeCore.toLowerCase();
   }
   return lowerAddress === channel.channelManager.toLowerCase();
 }

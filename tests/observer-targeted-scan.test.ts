@@ -25,6 +25,8 @@ const EXPECTED_TARGETED_EVENT_NAMES = [
   "AssetsClaimed",
   "ChannelJoinTollPaid",
   "ChannelExitRefunded",
+  "ChannelExitTollBurned",
+  "ChannelOperationAbandoned",
 ];
 
 test("builds one multi-address multi-topic targeted observer log filter", () => {
@@ -43,7 +45,7 @@ test("builds one multi-address multi-topic targeted observer log filter", () => 
 });
 
 test("uses one active targeted observer cursor key", () => {
-  assert.equal(TARGETED_EVENT_SYNC_KEY, "targeted-observer-events-v1");
+  assert.equal(TARGETED_EVENT_SYNC_KEY, "targeted-observer-events-v2");
   assert.doesNotMatch(TARGETED_EVENT_SYNC_KEY, /^targeted:[^:]+:[^:]+$/u);
 });
 

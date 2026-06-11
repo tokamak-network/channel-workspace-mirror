@@ -31,6 +31,8 @@ export type ObserverChannelRow = {
   bridge_core_implementation: string | null;
   bridge_token_vault_implementation: string | null;
   current_join_toll: string | null;
+  join_toll_burn_address: string | null;
+  channel_operation_abandoned_at: string | null;
   toll_refund_cutoff1_seconds: string | null;
   toll_refund_cutoff2_seconds: string | null;
   toll_refund_cutoff3_seconds: string | null;
@@ -149,7 +151,7 @@ const EMPTY_LIST_TOTALS: Record<ObserverEventListName, string> = {
 };
 
 const DECODED_FIELDS = {
-  bridge: ["user", "channelId", "amount", "refundBps"],
+  bridge: ["user", "channelId", "amount", "refundBps", "burnAddress"],
   channelCreated: ["channelId", "dappId", "manager", "bridgeTokenVault"],
   transition: ["rootVectorHash"],
   participantJoin: ["l1Address", "l2Address", "channelTokenVaultKey", "leafIndex", "joinTollPaid", "joinedAt", "noteReceivePubKeyX", "noteReceivePubKeyYParity"],
@@ -157,11 +159,11 @@ const DECODED_FIELDS = {
   commitment: ["storageKey"],
   encryptedPayload: ["encryptedNoteValue"],
   privateState: ["rootVectorHash", "storageAddr", "storageKey", "value", "l2Address"],
-  policy: ["previousJoinToll", "newJoinToll", "cutoff1", "bps1", "cutoff2", "bps2", "cutoff3", "bps3", "bps4"],
+  policy: ["previousJoinToll", "newJoinToll", "cutoff1", "bps1", "cutoff2", "bps2", "cutoff3", "bps3", "bps4", "channelId", "leader", "abandonedAt"],
   verifier: ["grothVerifier", "tokamakVerifier"],
   admin: ["previousOwner", "newOwner"],
   upgrade: ["implementation"],
-  api: ["user", "channelId", "amount", "refundBps", "l1Address", "l2Address", "channelTokenVaultKey", "leafIndex", "joinedAt", "rootVectorHash", "storageKey", "encryptedNoteValue", "implementation"],
+  api: ["user", "channelId", "amount", "refundBps", "burnAddress", "leader", "abandonedAt", "l1Address", "l2Address", "channelTokenVaultKey", "leafIndex", "joinedAt", "rootVectorHash", "storageKey", "encryptedNoteValue", "implementation"],
 } as const;
 
 type EventQueryFilters = {
